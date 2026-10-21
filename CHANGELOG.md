@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+Search API v1 (additive):
+
+- Added `GET /api/v1/memes/:id/similar?limit=1..20`, which returns the memes
+  closest to one meme's description embedding, without re-embedding text on
+  the client. It uses the `search:read` scope and shares the per-token search
+  rate limit; a meme without embeddings yet returns an empty list.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

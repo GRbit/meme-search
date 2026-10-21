@@ -36,6 +36,24 @@ module Api
         }
       end
 
+      def similar
+        return unless require_scope!("search:read")
+        return unless validate_limit
+
+        image_core = ImageCore.find(params[:id])
+        results = SimilarMemesQuery.new(image_core: image_core, limit: limit).call
+        preload_tags(results)
+
+        render json: {
+          data: results.map { |result| serialize(result) },
+          meta: {
+            meme_id: image_core.id,
+            limit: limit,
+            count: results.length
+          }
+        }
+      end
+
       private
 
         def validate_search_params
@@ -58,19 +76,23 @@ module Api
             return false
           end
 
-          if params[:limit].present? &&
-              (parsed_limit.nil? || !parsed_limit.between?(1, ImageSearchQuery::MAX_RESULT_LIMIT))
-            render_api_error(
-              :invalid_limit,
-              "limit must be an integer between 1 and #{ImageSearchQuery::MAX_RESULT_LIMIT}.",
-              :unprocessable_entity
-            )
-            return false
-          end
+          return false unless validate_limit
 
           return true if ALLOWED_MODES.include?(mode)
 
           render_api_error(:invalid_mode, "mode must be keyword or vector.", :unprocessable_entity)
+          false
+        end
+
+        def validate_limit
+          return true if params[:limit].blank? ||
+            parsed_limit&.between?(1, ImageSearchQuery::MAX_RESULT_LIMIT)
+
+          render_api_error(
+            :invalid_limit,
+            "limit must be an integer between 1 and #{ImageSearchQuery::MAX_RESULT_LIMIT}.",
+            :unprocessable_entity
+          )
           false
         end
 

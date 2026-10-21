@@ -157,6 +157,41 @@ installation already has metadata for an unsafe-but-present entry, a rescan
 preserves that record and its tags, embeddings, and generation history while
 logging the unsafe name. A truly missing entry is still removed normally.
 
+```sh
+curl --get http://127.0.0.1:3000/api/v1/memes/42/similar \
+  --header "Authorization: Bearer $MEME_SEARCH_API_TOKEN" \
+  --data "limit=5"
+```
+
+`GET /api/v1/memes/:id/similar` returns the memes whose descriptions are
+closest to meme `:id`, without re-embedding any text on the client. The meme
+is represented by the embedding of its whole description; every other meme is
+ranked by the cosine distance of its closest description chunk, like vector
+search, and appears at most once. The meme itself is excluded. `limit` must be
+from 1-20 (default 10). It needs `search:read` and counts against the same
+60-requests-per-minute token limit as search. A meme without a description
+embedding yet returns an empty `data` list; an unknown id returns 404.
+
+```json
+{
+  "data": [
+    {
+      "id": 7,
+      "filename": "incident.jpg",
+      "description": "A dog calmly sitting in a burning room",
+      "tags": ["work"],
+      "media_type": "image/jpeg",
+      "content_url": "/api/v1/memes/7/content"
+    }
+  ],
+  "meta": {
+    "meme_id": 42,
+    "limit": 5,
+    "count": 1
+  }
+}
+```
+
 Errors use `{"error":{"code":"...","message":"..."}}`:
 
 | Status | Meaning |
@@ -165,7 +200,7 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
 | `422` | query, mode, tag, or limit violates the documented contract |
-| `429` | this authenticated token exceeded 60 searches per minute |
+| `429` | this authenticated token exceeded 60 search or similar requests per minute |
 
 The machine-readable contract is available in
 [`search-api-openapi.yml`](search-api-openapi.yml).
