@@ -72,7 +72,7 @@ module Settings
 
       def load_index
         load_tokens
-        @api_token = ApiToken.new(scopes: ApiToken::ALLOWED_SCOPES)
+        @api_token = ApiToken.new(scopes: ApiToken::DEFAULT_SCOPES)
         @expires_at_input = nil
         @expires_at_local_input = nil
       end

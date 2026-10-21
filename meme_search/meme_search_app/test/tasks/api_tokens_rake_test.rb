@@ -51,4 +51,25 @@ class ApiTokensRakeTest < ActiveSupport::TestCase
     assert_no_match(/ms_[A-Za-z0-9_-]{43}/, stderr)
     assert_equal 0, ApiToken.where(name: "Rake client").count
   end
+
+  test "create without SCOPES grants only the read scopes" do
+    ENV.delete("SCOPES")
+
+    capture_io { @task.invoke }
+
+    assert_equal %w[search:read media:read], ApiToken.find_by!(name: "Rake client").scopes
+  end
+
+  test "create grants media:write only when SCOPES names it" do
+    ENV["SCOPES"] = "search:read,media:write"
+
+    _stdout, stderr = capture_io do
+      @task.invoke
+    rescue SystemExit
+      nil
+    end
+
+    assert_empty stderr
+    assert_equal %w[search:read media:write], ApiToken.find_by!(name: "Rake client").scopes
+  end
 end

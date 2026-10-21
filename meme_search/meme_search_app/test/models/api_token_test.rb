@@ -29,6 +29,17 @@ class ApiTokenTest < ActiveSupport::TestCase
     end
   end
 
+  test "media:write is supported but never part of the default scopes" do
+    default_token, = ApiToken.issue!(name: "Default scopes")
+    writer, = ApiToken.issue!(name: "Writer", scopes: [ "media:write" ])
+
+    assert_includes ApiToken::ALLOWED_SCOPES, "media:write"
+    assert_not_includes ApiToken::DEFAULT_SCOPES, "media:write"
+    assert_equal %w[search:read media:read], default_token.scopes
+    assert_not default_token.scope?("media:write")
+    assert writer.scope?("media:write")
+  end
+
   test "requires at least one read scope" do
     assert_raises ActiveRecord::RecordInvalid do
       ApiToken.issue!(name: "No access", scopes: [])

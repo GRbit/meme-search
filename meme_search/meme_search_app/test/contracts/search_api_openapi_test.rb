@@ -37,7 +37,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
   test "keeps query bounds modes and scopes aligned with the server" do
     parameters = search_operation.fetch("parameters").index_by { |parameter| parameter.fetch("name") }
 
-    assert_equal ApiToken::ALLOWED_SCOPES, @contract.dig("info", "x-token-scopes")
+    assert_equal ApiToken::READ_SCOPES, @contract.dig("info", "x-token-scopes")
     assert_equal "search:read", search_operation.fetch("x-required-scope")
     assert_equal "search:read", operation("/api/v1/memes/{id}").fetch("x-required-scope")
     assert_equal "media:read", operation("/api/v1/memes/{id}/content").fetch("x-required-scope")

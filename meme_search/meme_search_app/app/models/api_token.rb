@@ -6,7 +6,12 @@ require "time"
 
 class ApiToken < ApplicationRecord
   TOKEN_PREFIX = "ms_"
-  ALLOWED_SCOPES = %w[search:read media:read].freeze
+  READ_SCOPES = %w[search:read media:read].freeze
+  # API v2 uploads. Never a default: a token gets it only when its creator
+  # selects it, so tokens issued before v2 can never write.
+  WRITE_SCOPES = %w[media:write].freeze
+  ALLOWED_SCOPES = (READ_SCOPES + WRITE_SCOPES).freeze
+  DEFAULT_SCOPES = READ_SCOPES
   LAST_USED_WRITE_INTERVAL = 5.minutes
   TIMEZONE_SUFFIX = /(?:Z|[+-]\d{2}:\d{2})\z/
 
@@ -22,7 +27,7 @@ class ApiToken < ApplicationRecord
       .where("expires_at IS NULL OR expires_at > ?", Time.current)
   }
 
-  def self.issue!(name:, scopes: ALLOWED_SCOPES, expires_at: nil)
+  def self.issue!(name:, scopes: DEFAULT_SCOPES, expires_at: nil)
     raw_token = "#{TOKEN_PREFIX}#{SecureRandom.urlsafe_base64(32)}"
     record = create!(
       name: name,
