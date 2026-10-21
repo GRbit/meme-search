@@ -123,7 +123,8 @@ required field requires a new API version.
       "description": "A celebratory reaction after a successful deploy",
       "tags": ["reaction", "work"],
       "media_type": "image/gif",
-      "content_url": "/api/v1/memes/42/content"
+      "content_url": "/api/v1/memes/42/content",
+      "folder": "work/reactions"
     }
   ],
   "meta": {
@@ -135,6 +136,12 @@ required field requires a new API version.
   }
 }
 ```
+
+`folder` is the library folder that holds the meme: its name relative to the
+memes root (`public/memes`, `/rails/public/memes` in the Docker image), exactly
+as registered under **Settings → Paths**, for example `work/reactions`. It is a
+name, not a filesystem path, so clients still never need to know where the
+library is mounted. It is optional in v1: older servers omit it.
 
 The relative `content_url` is deliberate. Fetch it from the same instance and
 send the same bearer token:

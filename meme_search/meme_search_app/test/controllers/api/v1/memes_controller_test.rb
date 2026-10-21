@@ -37,6 +37,14 @@ class Api::V1::MemesControllerTest < ActionDispatch::IntegrationTest
     assert_nil response.parsed_body.dig("data", "image_path")
   end
 
+  test "names the library folder relative to the memes root" do
+    get api_v1_meme_url(@image_core), headers: authorization_header
+
+    assert_response :success
+    assert_equal @image_core.image_path.name, response.parsed_body.dig("data", "folder")
+    assert_not_includes response.parsed_body.dig("data", "folder"), Rails.root.to_s
+  end
+
   test "streams content through the authenticated endpoint" do
     get content_api_v1_meme_url(@image_core), headers: authorization_header
 

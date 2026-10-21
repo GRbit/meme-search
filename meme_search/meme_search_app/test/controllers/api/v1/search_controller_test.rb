@@ -31,6 +31,22 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     assert_equal [ "tag_two" ], body.dig("data", 0, "tags")
     assert_equal content_api_v1_meme_path(image_cores(:three)), body.dig("data", 0, "content_url")
     assert_nil body.dig("data", 0, "image_path")
+    assert_equal image_paths(:two).name, body.dig("data", 0, "folder")
+  end
+
+  test "loads result folders in one query" do
+    image_path_queries = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      image_path_queries << payload[:sql] if payload[:sql].include?("FROM \"image_paths\"")
+    end
+
+    get api_v1_search_url, params: { q: "image" }, headers: authorization_header
+
+    assert_response :success
+    assert_equal 4, response.parsed_body.dig("meta", "count")
+    assert_equal 1, image_path_queries.length, image_path_queries.join("\n")
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
   end
 
   test "rejects invalid queries and modes" do

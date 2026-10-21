@@ -22,7 +22,7 @@ module Api
           selected_tag_names: requested_tags,
           limit: limit
         ).call
-        preload_tags(results)
+        preload_associations(results)
 
         render json: {
           data: results.map { |image_core| serialize(image_core) },
@@ -102,10 +102,10 @@ module Api
           Array(params[:tag]) + Array(params[:tags])
         end
 
-        def preload_tags(results)
+        def preload_associations(results)
           ActiveRecord::Associations::Preloader.new(
             records: results.to_a,
-            associations: { image_tags: :tag_name }
+            associations: [ :image_path, { image_tags: :tag_name } ]
           ).call
         end
 

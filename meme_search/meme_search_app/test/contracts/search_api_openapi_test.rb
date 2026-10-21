@@ -71,7 +71,9 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       content_url: "/api/v1/memes/#{image_cores(:one).id}/content"
     ).as_json.keys.map(&:to_s)
 
-    assert_equal serialized_keys.sort, meme_schema.fetch("required").sort
+    # Fields added after v1.0 stay optional so clients keep accepting older servers.
+    assert_equal %w[content_url description filename id media_type tags],
+      meme_schema.fetch("required").sort
     assert_equal serialized_keys.sort, meme_schema.fetch("properties").keys.sort
     assert_equal true, meme_schema.fetch("additionalProperties")
     assert_equal %w[count limit mode query tags].sort,
