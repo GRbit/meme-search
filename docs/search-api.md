@@ -151,9 +151,9 @@ curl http://127.0.0.1:3000/api/v1/memes/42/content \
 ```
 
 `GET /api/v1/tags` lists the tag names that at least one meme carries, so a
-client can offer choices instead of free text. It needs `search:read`, shares
-the 60 requests per token per minute limit and returns every tag in one
-response, ordered by name:
+client can offer choices instead of free text. It needs `search:read`, has its
+own 60 requests per token per minute limit (counted separately from search)
+and returns every tag in one response, ordered by name:
 
 ```json
 {
