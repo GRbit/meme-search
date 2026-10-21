@@ -56,6 +56,14 @@ paths:
             minimum: 1
             maximum: 20
             default: 10
+        - name: offset
+          in: query
+          description: Number of ranked results to skip, for paging past the first limit results.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 200
+            default: 0
       responses:
         "200":
           description: Ranked search results
@@ -208,6 +216,15 @@ components:
               type: integer
               minimum: 0
               maximum: 20
+            offset:
+              type: integer
+              minimum: 0
+              maximum: 200
+            next_offset:
+              type: integer
+              minimum: 1
+              maximum: 200
+              description: Present only when more results exist and the offset to request them is allowed.
     ErrorResponse:
       type: object
       additionalProperties: true

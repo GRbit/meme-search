@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+Search API v1 paging (additive):
+
+- `GET /api/v1/search` accepts an optional `offset` (0-200, default 0) in
+  keyword and vector modes, and `meta` now reports `offset` and, when more
+  results exist, `next_offset`. Results with equal rank are ordered by meme id
+  so pages do not overlap. Existing parameters, bounds and fields are unchanged.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

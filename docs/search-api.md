@@ -101,6 +101,7 @@ curl --get http://127.0.0.1:3000/api/v1/search \
   --data-urlencode "q=production incident" \
   --data "mode=keyword" \
   --data "limit=5" \
+  --data "offset=0" \
   --data-urlencode "tag=reaction"
 ```
 
@@ -108,7 +109,13 @@ curl --get http://127.0.0.1:3000/api/v1/search \
 default) or `vector`. `tag` may be repeated and matches any selected tag.
 Each repeated value is one exact tag; commas are not separators, so clients
 must percent-encode commas that are part of a tag name.
-`limit` must be from 1–20. Search is limited to 60 requests per token per
+`limit` must be from 1–20. `offset` (optional, default 0) must be from 0–200
+and skips that many ranked results in either mode; ordering is stable across
+pages because ties are broken by meme id. When more results exist,
+`meta.next_offset` is the `offset` to request next; it is absent on the last
+page and when the next offset would exceed 200. Page sequentially with the
+same `q`, `mode`, `tag` and `limit`: the library may change between requests.
+Search is limited to 60 requests per token per
 minute. Tag filtering happens before the result limit in both modes.
 Clients must require the documented fields but ignore unknown response fields.
 API v1 may add optional fields without a version change; removing or changing a
@@ -131,6 +138,7 @@ required field requires a new API version.
     "mode": "keyword",
     "tags": ["reaction"],
     "limit": 5,
+    "offset": 0,
     "count": 1
   }
 }
@@ -164,7 +172,7 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `401` | bearer token is missing, invalid, expired, or revoked |
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
-| `422` | query, mode, tag, or limit violates the documented contract |
+| `422` | query, mode, tag, limit, or offset violates the documented contract |
 | `429` | this authenticated token exceeded 60 searches per minute |
 
 The machine-readable contract is available in
@@ -324,7 +332,7 @@ reviewed.
   expired or was revoked. The raw value cannot be recovered from its prefix.
 - `403 forbidden`: add the needed read scope by creating a replacement token;
   scopes on an existing token are intentionally not mutated.
-- `422 invalid_*`: compare query/mode/tags/limit to the bounds above and to the
+- `422 invalid_*`: compare query/mode/tags/limit/offset to the bounds above and to the
   machine-readable contract.
 - `429 rate_limited`: wait for the per-token minute window; do not share one
   token across clients to bypass attribution.

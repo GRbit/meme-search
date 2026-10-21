@@ -52,6 +52,9 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     )
     assert_equal 1, parameters.dig("limit", "schema", "minimum")
     assert_equal ImageSearchQuery::DEFAULT_RESULT_LIMIT, parameters.dig("limit", "schema", "default")
+    assert_equal 0, parameters.dig("offset", "schema", "minimum")
+    assert_equal Api::V1::SearchController::MAX_OFFSET, parameters.dig("offset", "schema", "maximum")
+    assert_equal 0, parameters.dig("offset", "schema", "default")
     assert_equal(
       {
         "requests" => 60,
@@ -125,6 +128,13 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       headers: authorization_header
     assert_response :success
     assert_schema_instance("SearchResponse", response.parsed_body)
+
+    get api_v1_search_url,
+      params: { q: "image", limit: 2 },
+      headers: authorization_header
+    assert_response :success
+    assert_schema_instance("SearchResponse", response.parsed_body)
+    assert response.parsed_body.dig("meta").key?("next_offset")
 
     get api_v1_search_url, params: { q: "bunny" }
     assert_response :unauthorized
