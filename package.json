@@ -25,7 +25,7 @@
     "test:e2e:docker:headed": "playwright test --config=playwright-docker/config/playwright.config.docker.ts --headed",
     "test:e2e:docker:debug": "playwright test --config=playwright-docker/config/playwright.config.docker.ts --debug",
     "test:e2e:docker:report": "playwright show-report playwright-docker/playwright-report-docker",
-    "contract:openapi": "redocly lint docs/search-api-openapi.yml --extends=minimal"
+    "contract:openapi": "redocly lint docs/search-api-openapi.yml --extends=minimal && redocly lint docs/api-v2-openapi.yml --extends=minimal"
   },
   "repository": {
     "type": "git",

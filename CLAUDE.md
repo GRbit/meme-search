@@ -221,6 +221,6 @@ npm run test:e2e:report   # View last report
 
 **Testing**:
 - Rails controller tests: `test/controllers/image_uploads_controller_test.rb` (29 tests, pin the exact JSON responses)
-- Rails service tests: `test/services/image_upload_service_test.rb` (3 tests)
+- Rails service tests: `test/services/image_upload_service_test.rb` (4 tests)
 - Playwright E2E: `playwright/tests/image-uploads.spec.ts` (7 tests)
 - Page Object: `playwright/pages/image-uploads.page.ts`

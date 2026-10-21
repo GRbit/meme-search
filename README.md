@@ -345,6 +345,11 @@ API v1 is officially supported only on loopback and is permanently read-only.
 Its bearer tokens do not authenticate the web UI or settings, so do not expose
 the app directly to a public network.
 
+Clients that save memes (for example a chat bot) can upload through
+`POST /api/v2/memes` with a token that has the opt-in `media:write` scope,
+instead of writing into the library folder; see the
+[upload section of the API guide](docs/search-api.md#upload-api-v2).
+
 ### Model downloads
 
 The image-to-text models used to auto generate descriptions for your memes are all open source, and vary in size.
