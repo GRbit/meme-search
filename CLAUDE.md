@@ -153,7 +153,7 @@ npm run test:e2e:report   # View last report
 ## Architecture Quick Reference
 
 **Rails Models**: `ImageCore` (main meme entity), `ImageEmbedding` (384-dim vectors), `ImagePath`, `TagName`, `ImageTag`, `ImageToText`
-**Rails Controllers**: `ImageCoresController` (CRUD/search/webhooks), `ImageUploadsController` (drag-and-drop uploads), `Settings::{ImagePaths,TagNames,ImageToTexts}Controller`
+**Rails Controllers**: `ImageCoresController` (CRUD/search/webhooks), `ImageUploadsController` (drag-and-drop uploads, thin wrapper around `ImageUploadService`), `Settings::{ImagePaths,TagNames,ImageToTexts}Controller`
 **Rails Channels**: `ImageDescriptionChannel`, `ImageStatusChannel` (WebSocket real-time updates)
 **Stimulus Controllers**: `file_upload_controller.js` (drag-and-drop upload UI with preview/validation)
 
@@ -184,7 +184,7 @@ npm run test:e2e:report   # View last report
 
 **Image Processing (Directory Scan)**: User adds path → `ImagePath` creates `ImageCore` → Rails calls Python `/add_job` → Python processes → Calls Rails webhooks (`description_receiver`, `status_receiver`) → Rails updates DB + broadcasts WebSocket → `ImageEmbedding` created for vector search
 
-**Image Upload (Drag-and-Drop)**: User drags images to `/image_uploads/new` → Browser validates (JPG/PNG/WEBP, <10MB) → POST to `ImageUploadsController#create` → Files saved to `/public/memes/direct-uploads/` → Auto-creates "direct-uploads" `ImagePath` → Triggers scan → Creates `ImageCore` records → User manually generates descriptions
+**Image Upload (Drag-and-Drop)**: User drags images to `/image_uploads/new` → Browser validates (JPG/PNG/WEBP, <10MB) → POST to `ImageUploadsController#create` (validation, storage and scan in `ImageUploadService`) → Files saved to `/public/memes/direct-uploads/` → Auto-creates "direct-uploads" `ImagePath` → Triggers scan → Creates `ImageCore` records → User manually generates descriptions
 
 **Search**: Keyword (PgSearch `search_any_word`), Vector (embedding → cosine similarity via neighbor gem), Filtering (tags, paths, embeddings)
 
@@ -216,10 +216,11 @@ npm run test:e2e:report   # View last report
 - Host: `./meme_search/direct-uploads/`
 - Container: `/rails/public/memes/direct-uploads/` and `/app/public/memes/direct-uploads/`
 - Uses original filenames (sanitized for safety)
-- Same filename overwrites previous file
+- A name clash gets a unix timestamp suffix (`name_1700000000.jpg`), never an overwrite
 - Files kept indefinitely (user deletes via standard ImageCore UI)
 
 **Testing**:
-- Rails controller tests: `test/controllers/image_uploads_controller_test.rb` (8 tests)
+- Rails controller tests: `test/controllers/image_uploads_controller_test.rb` (29 tests, pin the exact JSON responses)
+- Rails service tests: `test/services/image_upload_service_test.rb` (3 tests)
 - Playwright E2E: `playwright/tests/image-uploads.spec.ts` (7 tests)
 - Page Object: `playwright/pages/image-uploads.page.ts`
