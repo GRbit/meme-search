@@ -11,14 +11,17 @@ class ImageUploadService
   ALLOWED_EXTENSIONS = %w[.jpg .jpeg .png .webp .gif].freeze
 
   # Outcome of one call. `scan` is only part of #to_h when a scan was attempted,
-  # which happens only if at least one file was stored.
+  # which happens only if at least one file was stored. `outcomes` holds the
+  # same per-file hashes in input order: a stored file's hash carries the stored
+  # name only, so callers that need to pair results with inputs use it.
   class Result
-    attr_reader :image_path, :uploaded, :errors, :scan
+    attr_reader :image_path, :uploaded, :errors, :outcomes, :scan
 
-    def initialize(image_path:, uploaded:, errors:, scanned:, scan:)
+    def initialize(image_path:, uploaded:, errors:, outcomes:, scanned:, scan:)
       @image_path = image_path
       @uploaded = uploaded
       @errors = errors
+      @outcomes = outcomes
       @scanned = scanned
       @scan = scan
     end
@@ -47,9 +50,11 @@ class ImageUploadService
     image_path = @image_path || ImagePath.ensure_direct_uploads_path!
     uploaded = []
     errors = []
+    outcomes = []
 
     files.each do |file|
       result = process_upload(file, image_path)
+      outcomes << result
 
       if result[:success]
         uploaded << result
@@ -60,7 +65,10 @@ class ImageUploadService
 
     scan = image_path.scan_and_update! if uploaded.any?
 
-    Result.new(image_path: image_path, uploaded: uploaded, errors: errors, scanned: uploaded.any?, scan: scan)
+    Result.new(
+      image_path: image_path, uploaded: uploaded, errors: errors, outcomes: outcomes,
+      scanned: uploaded.any?, scan: scan
+    )
   end
 
   private

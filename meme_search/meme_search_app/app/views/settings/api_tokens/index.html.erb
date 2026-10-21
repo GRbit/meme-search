@@ -11,14 +11,14 @@
       API tokens
     </h1>
     <p class="text-gray-600 dark:text-gray-400 mt-2">
-      Create revocable credentials for local, read-only integrations.
+      Create revocable credentials for local integrations. Tokens are read-only unless you select <code>media:write</code>.
     </p>
   </div>
 
   <div class="mb-8 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
     <h2 class="font-bold">Local API boundary</h2>
     <p class="mt-2 text-sm">
-      Official support is loopback-only. These tokens protect only <code>/api/v1</code>;
+      Official support is loopback-only. These tokens protect only <code>/api/v1</code> and <code>/api/v2</code>;
       they do not authenticate this settings page or the rest of the web application.
       Do not expose Meme Search directly to a public network.
     </p>

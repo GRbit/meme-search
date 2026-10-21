@@ -61,4 +61,16 @@ class ImageUploadServiceTest < ActiveSupport::TestCase
     image_path&.destroy
     FileUtils.rm_rf(directory) if directory
   end
+
+  test "reports one outcome per file in input order" do
+    files = [ upload("order_a.jpg"), upload("order_bad.jpg", "not an image"), upload("order_a.jpg") ]
+
+    result = ImageUploadService.new.call(files)
+
+    assert_equal [ true, false, true ], result.outcomes.map { |outcome| outcome[:success] }
+    assert_equal result.uploaded.first, result.outcomes.first
+    assert_equal result.errors.first, result.outcomes.second
+    assert_equal result.uploaded.second, result.outcomes.third
+    assert_equal [ :success, :errors, :scan ], result.to_h.keys
+  end
 end

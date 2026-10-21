@@ -6,6 +6,9 @@ Rails.application.routes.draw do
         get :content, on: :member
       end
     end
+    namespace :v2 do
+      resources :memes, only: [ :create ]
+    end
   end
 
   resources :image_to_texts

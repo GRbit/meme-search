@@ -22,7 +22,7 @@ module Settings
       assert_response :success
       assert_includes response.body, "API tokens"
       assert_includes response.body, "loopback-only"
-      assert_includes response.body, "protect only <code>/api/v1</code>"
+      assert_includes response.body, "protect only <code>/api/v1</code> and <code>/api/v2</code>"
       assert_includes response.body, "Search API setup and security guide"
       assert_includes response.body, ERB::Util.html_escape(active.name)
       assert_not_includes response.body, active.name
