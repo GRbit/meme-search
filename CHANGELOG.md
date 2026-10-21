@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+Search inside folders:
+
+- The search page has the gallery's Paths toggle. Keyword and vector search
+  return only memes from the selected folders, combined with the tag filter
+  (any selected folder and any selected tag).
+- The folder filter runs in the database before ranking, so a folder's best
+  matches are found even when they are not among the library-wide top results.
+- Fixed the Paths toggle lowercasing folder names, which made folders with
+  uppercase letters impossible to filter by in the gallery.
+
+This change does not change the database schema or Search API contract.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

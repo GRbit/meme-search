@@ -146,7 +146,7 @@ Features of Meme Search include:
 
 7. **New Organizational Tools**
 
-   Filter by tags, directory paths, and description embeddings, plus toggle between keyword and vector search for more control.
+   Filter by tags, directory paths, and description embeddings, plus toggle between keyword and vector search for more control. Search results can be limited to selected tags and directory paths as well.
 
 8. **Bulk Description Generation**
 
