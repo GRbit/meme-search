@@ -34,6 +34,23 @@ class ImageCoresControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "path toggle submits folder names with their original case" do
+    @image_path.update_column(:name, "Mixed_Case_Memes")
+
+    get image_cores_url
+
+    assert_select "#path_toggle input[type=checkbox][value=?]", "Mixed_Case_Memes"
+  end
+
+  test "index filters by a mixed case folder name as the path toggle submits it" do
+    @image_path.update_column(:name, "Mixed_Case_Memes")
+
+    get image_cores_url, params: { selected_path_names: "Mixed_Case_Memes" }
+
+    assert_response :success
+    assert_equal @image_path.image_cores.ids.sort, assigns(:image_cores).map(&:id).sort
+  end
+
   test "index should filter by has_embeddings" do
     get image_cores_url, params: { has_embeddings: "true" }
     assert_response :success
