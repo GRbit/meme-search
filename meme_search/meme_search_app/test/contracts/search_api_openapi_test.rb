@@ -46,6 +46,9 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal Api::V1::SearchController::TAG_MAX_COUNT, parameters.dig("tag", "schema", "maxItems")
     assert_equal Api::V1::SearchController::TAG_MAX_LENGTH,
       parameters.dig("tag", "schema", "items", "maxLength")
+    assert_equal Api::V1::SearchController::FOLDER_MAX_COUNT, parameters.dig("folder", "schema", "maxItems")
+    assert_equal Api::V1::SearchController::FOLDER_MAX_LENGTH,
+      parameters.dig("folder", "schema", "items", "maxLength")
     assert_equal(
       ImageSearchQuery::MAX_RESULT_LIMIT,
       parameters.dig("limit", "schema", "maximum")
@@ -124,6 +127,12 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
   test "live success and common error responses conform to their schemas" do
     get api_v1_search_url,
       params: { q: "bunny", mode: "keyword", limit: 5 },
+      headers: authorization_header
+    assert_response :success
+    assert_schema_instance("SearchResponse", response.parsed_body)
+
+    get api_v1_search_url,
+      params: { q: "image", folder: image_paths(:two).name },
       headers: authorization_header
     assert_response :success
     assert_schema_instance("SearchResponse", response.parsed_body)

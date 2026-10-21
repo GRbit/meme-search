@@ -131,6 +131,111 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     assert_equal "invalid_tags", response.parsed_body.dig("error", "code")
   end
 
+  test "filters by repeated folder parameters and echoes them" do
+    get "#{api_v1_search_url}?q=image&folder=#{image_paths(:two).name}",
+      headers: authorization_header
+
+    assert_response :success
+    assert_equal [ image_paths(:two).name ], response.parsed_body.dig("meta", "folders")
+    assert_equal(
+      [ image_cores(:three).id, image_cores(:four).id ].sort,
+      response.parsed_body.fetch("data").map { |item| item.fetch("id") }.sort
+    )
+
+    get "#{api_v1_search_url}?q=image&folder=#{image_paths(:one).name}&folder=#{image_paths(:two).name}",
+      headers: authorization_header
+
+    assert_response :success
+    assert_equal image_paths(:one, :two).map(&:name), response.parsed_body.dig("meta", "folders")
+    assert_equal 4, response.parsed_body.dig("meta", "count")
+  end
+
+  test "echoes no folders when none are requested" do
+    get api_v1_search_url, params: { q: "image" }, headers: authorization_header
+
+    assert_response :success
+    assert_equal [], response.parsed_body.dig("meta", "folders")
+    assert_equal 4, response.parsed_body.dig("meta", "count")
+  end
+
+  test "combines folders and tags" do
+    get "#{api_v1_search_url}?q=image&folder=#{image_paths(:one).name}&tag=tag_two",
+      headers: authorization_header
+
+    assert_response :success
+    assert_equal [ image_cores(:two).id ], response.parsed_body.fetch("data").map { |item| item.fetch("id") }
+  end
+
+  test "filters vector search by folder" do
+    query_vector = [ 1.0 ] + Array.new(383, 0.0)
+    image_cores(:one, :three).each do |image_core|
+      ImageEmbedding.create!(image_core: image_core, snippet: "snippet", embedding: query_vector)
+    end
+    query_embedding = ImageEmbedding.new(image_core: image_cores(:one), snippet: "query", embedding: query_vector)
+    query_embedding.define_singleton_method(:compute_embedding) { query_vector }
+
+    ImageEmbedding.stub(:new, query_embedding) do
+      get api_v1_search_url,
+        params: { q: "reaction", mode: "vector", folder: image_paths(:two).name },
+        headers: authorization_header
+    end
+
+    assert_response :success
+    assert_equal [ image_cores(:three).id ], response.parsed_body.fetch("data").map { |item| item.fetch("id") }
+  end
+
+  test "matches folder names exactly, including slashes and case" do
+    nested = ImagePath.new(name: "Work/Reactions")
+    nested.save!(validate: false)
+    image_core = ImageCore.create!(image_path: nested, name: "nested.jpg", description: "nested image", status: :not_started)
+
+    get api_v1_search_url, params: { q: "image", folder: "Work/Reactions" }, headers: authorization_header
+
+    assert_response :success
+    assert_equal [ image_core.id ], response.parsed_body.fetch("data").map { |item| item.fetch("id") }
+    assert_equal "Work/Reactions", response.parsed_body.dig("data", 0, "folder")
+
+    get api_v1_search_url, params: { q: "image", folder: "work/reactions" }, headers: authorization_header
+
+    assert_response :unprocessable_entity
+    assert_equal "invalid_folder", response.parsed_body.dig("error", "code")
+  end
+
+  test "rejects unknown folders" do
+    get "#{api_v1_search_url}?q=image&folder=#{image_paths(:one).name}&folder=no_such_folder",
+      headers: authorization_header
+
+    assert_response :unprocessable_entity
+    assert_equal "invalid_folder", response.parsed_body.dig("error", "code")
+  end
+
+  test "rejects folder input beyond the documented bounds" do
+    too_many = Array.new(Api::V1::SearchController::FOLDER_MAX_COUNT + 1) { |index| "folder=f#{index}" }
+    get "#{api_v1_search_url}?q=image&#{too_many.join("&")}", headers: authorization_header
+
+    assert_response :unprocessable_entity
+    assert_equal "invalid_folder", response.parsed_body.dig("error", "code")
+
+    get api_v1_search_url,
+      params: { q: "image", folder: "f" * (Api::V1::SearchController::FOLDER_MAX_LENGTH + 1) },
+      headers: authorization_header
+
+    assert_response :unprocessable_entity
+    assert_equal "invalid_folder", response.parsed_body.dig("error", "code")
+  end
+
+  test "accepts the maximum number of folders" do
+    names = Array.new(Api::V1::SearchController::FOLDER_MAX_COUNT) { |index| "bound_#{index}" }
+    names.each { |name| ImagePath.new(name: name).save!(validate: false) }
+
+    get "#{api_v1_search_url}?q=image&#{names.map { |name| "folder=#{name}" }.join("&")}",
+      headers: authorization_header
+
+    assert_response :success
+    assert_equal names, response.parsed_body.dig("meta", "folders")
+    assert_equal 0, response.parsed_body.dig("meta", "count")
+  end
+
   test "requires search read scope" do
     _, media_token = ApiToken.issue!(name: "Media only", scopes: [ "media:read" ])
 

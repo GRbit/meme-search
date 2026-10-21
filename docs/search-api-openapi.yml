@@ -49,6 +49,17 @@ paths:
               maxLength: 20
           style: form
           explode: true
+        - name: folder
+          in: query
+          description: May be repeated. Each value is one exact library folder name relative to the memes root, as the `folder` response field returns it (case-sensitive, may contain `/`). Results match any supplied folder and, when tags are also given, any supplied tag as well. Unknown names return 422 `invalid_folder`.
+          schema:
+            type: array
+            maxItems: 10
+            items:
+              type: string
+              maxLength: 300
+          style: form
+          explode: true
         - name: limit
           in: query
           schema:
@@ -202,6 +213,11 @@ components:
               enum: [keyword, vector]
             tags:
               type: array
+              items:
+                type: string
+            folders:
+              type: array
+              description: The applied folder filter; empty without one. Older v1 servers omit it and ignore `folder`.
               items:
                 type: string
             limit:

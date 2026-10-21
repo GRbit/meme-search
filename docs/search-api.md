@@ -101,15 +101,24 @@ curl --get http://127.0.0.1:3000/api/v1/search \
   --data-urlencode "q=production incident" \
   --data "mode=keyword" \
   --data "limit=5" \
-  --data-urlencode "tag=reaction"
+  --data-urlencode "tag=reaction" \
+  --data-urlencode "folder=work/reactions"
 ```
 
 `q` is required and limited to 200 characters. `mode` is `keyword` (the
 default) or `vector`. `tag` may be repeated and matches any selected tag.
 Each repeated value is one exact tag; commas are not separators, so clients
 must percent-encode commas that are part of a tag name.
+`folder` may be repeated (at most 10) and limits results to memes in any of the
+given library folders. A folder is named relative to the memes root, exactly as
+the `folder` response field returns it (case-sensitive, `/` separates nested
+folders); it is never a filesystem path. Unknown names return `422 invalid_folder`. With
+both `folder` and `tag`, a meme must be in one of the folders and carry one of
+the tags. `meta.folders` echoes the applied folders (`[]` without a filter), so
+a client can detect an older server that ignored `folder` and searched the
+whole library.
 `limit` must be from 1–20. Search is limited to 60 requests per token per
-minute. Tag filtering happens before the result limit in both modes.
+minute. Tag and folder filtering happen before the result limit in both modes.
 Clients must require the documented fields but ignore unknown response fields.
 API v1 may add optional fields without a version change; removing or changing a
 required field requires a new API version.
@@ -131,6 +140,7 @@ required field requires a new API version.
     "query": "production incident",
     "mode": "keyword",
     "tags": ["reaction"],
+    "folders": ["work/reactions"],
     "limit": 5,
     "count": 1
   }
@@ -171,7 +181,7 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `401` | bearer token is missing, invalid, expired, or revoked |
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
-| `422` | query, mode, tag, or limit violates the documented contract |
+| `422` | query, mode, tag, folder, or limit violates the documented contract |
 | `429` | this authenticated token exceeded 60 searches per minute |
 
 The machine-readable contract is available in
@@ -331,7 +341,7 @@ reviewed.
   expired or was revoked. The raw value cannot be recovered from its prefix.
 - `403 forbidden`: add the needed read scope by creating a replacement token;
   scopes on an existing token are intentionally not mutated.
-- `422 invalid_*`: compare query/mode/tags/limit to the bounds above and to the
+- `422 invalid_*`: compare query/mode/tags/folders/limit to the bounds above and to the
   machine-readable contract.
 - `429 rate_limited`: wait for the per-token minute window; do not share one
   token across clients to bypass attribution.

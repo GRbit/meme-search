@@ -6,6 +6,8 @@ module Api
       QUERY_MAX_LENGTH = 200
       TAG_MAX_LENGTH = 20
       TAG_MAX_COUNT = 10
+      FOLDER_MAX_LENGTH = 300
+      FOLDER_MAX_COUNT = 10
       ALLOWED_MODES = %w[keyword vector].freeze
 
       rate_limit to: 60, within: 1.minute, by: -> { current_api_token&.id || request.remote_ip },
@@ -20,6 +22,7 @@ module Api
           query: params[:q],
           mode: mode,
           selected_tag_names: requested_tags,
+          selected_path_names: requested_folders,
           limit: limit
         ).call
         preload_associations(results)
@@ -30,6 +33,7 @@ module Api
             query: params[:q],
             mode: mode,
             tags: requested_tags,
+            folders: requested_folders,
             limit: limit,
             count: results.length
           }
@@ -58,6 +62,8 @@ module Api
             return false
           end
 
+          return false unless validate_folders
+
           if params[:limit].present? &&
               (parsed_limit.nil? || !parsed_limit.between?(1, ImageSearchQuery::MAX_RESULT_LIMIT))
             render_api_error(
@@ -71,6 +77,29 @@ module Api
           return true if ALLOWED_MODES.include?(mode)
 
           render_api_error(:invalid_mode, "mode must be keyword or vector.", :unprocessable_entity)
+          false
+        end
+
+        # Unknown folders are rejected rather than matching nothing, so a typo is not
+        # mistaken for an empty folder.
+        def validate_folders
+          if requested_folders.length > FOLDER_MAX_COUNT || requested_folders.any? { |folder| folder.length > FOLDER_MAX_LENGTH }
+            render_api_error(
+              :invalid_folder,
+              "Use at most #{FOLDER_MAX_COUNT} folders of #{FOLDER_MAX_LENGTH} characters or fewer.",
+              :unprocessable_entity
+            )
+            return false
+          end
+
+          return true if requested_folders.empty?
+          return true if ImagePath.where(name: requested_folders).count == requested_folders.length
+
+          render_api_error(
+            :invalid_folder,
+            "Every folder must be the exact name of a library folder.",
+            :unprocessable_entity
+          )
           false
         end
 
@@ -95,11 +124,30 @@ module Api
         end
 
         def query_tag_values
-          URI.decode_www_form(request.query_string)
-            .select { |name, _value| %w[tag tag[] tags tags[]].include?(name) }
-            .map(&:last)
+          query_values(%w[tag tag[] tags tags[]])
         rescue ArgumentError
           Array(params[:tag]) + Array(params[:tags])
+        end
+
+        def requested_folders
+          @requested_folders ||= query_folder_values
+            .map { |value| value.to_s.strip }
+            .reject(&:blank?)
+            .uniq
+        end
+
+        def query_folder_values
+          query_values(%w[folder])
+        rescue ArgumentError
+          Array(params[:folder])
+        end
+
+        # Read repeated values from the raw query string: Rails keeps only the last
+        # value of a repeated key without brackets.
+        def query_values(names)
+          URI.decode_www_form(request.query_string)
+            .select { |name, _value| names.include?(name) }
+            .map(&:last)
         end
 
         def preload_associations(results)
