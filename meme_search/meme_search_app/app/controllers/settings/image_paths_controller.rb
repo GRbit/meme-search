@@ -102,7 +102,7 @@ module Settings
 
       # Only allow a list of trusted parameters through.
       def image_path_params
-        params.require(:image_path).permit(:name, :scan_frequency_minutes)
+        params.require(:image_path).permit(:name, :scan_frequency_minutes, :include_subfolders)
       end
   end
 end

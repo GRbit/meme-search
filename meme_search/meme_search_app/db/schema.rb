@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_28_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_22_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -105,6 +105,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_000000) do
     t.text "last_scan_error"
     t.boolean "currently_scanning", default: false, null: false
     t.integer "last_scan_duration_ms"
+    t.boolean "include_subfolders", default: false, null: false
     t.index ["last_scanned_at"], name: "index_image_paths_on_last_scanned_at"
     t.index ["name"], name: "index_image_paths_on_name", unique: true
     t.index ["scan_frequency_minutes"], name: "index_image_paths_on_scan_frequency_minutes"
