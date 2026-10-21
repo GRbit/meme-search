@@ -51,7 +51,8 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
       :get_neighbor_image_core_ids,
       [ image_cores(:three).id, image_cores(:one).id ],
       limit: 10,
-      image_core_ids: nil
+      image_core_ids: nil,
+      offset: 0
     )
 
     ImageEmbedding.stub(:new, query_embedding) do
@@ -68,7 +69,7 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
     captured = {}
     tagged_image_core_id = image_cores(:three).id
     query_embedding.define_singleton_method(:compute_embedding) { Array.new(384, 0.5) }
-    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:|
+    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:, offset:|
       captured[:limit] = limit
       captured[:eligible_ids] = image_core_ids.to_a.map(&:id)
       [ tagged_image_core_id ]
@@ -150,5 +151,79 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
     results = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 100).call
 
     assert_operator results.length, :<=, ImageSearchQuery::MAX_RESULT_LIMIT
+  end
+
+  test "keyword offset pages continue the ranking without gaps or repeats" do
+    all_ids = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 20).call.map(&:id)
+    first = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 2).call.map(&:id)
+    second = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 2, offset: 2).call.map(&:id)
+
+    assert_equal 4, all_ids.length
+    assert_equal all_ids, first + second
+  end
+
+  test "keyword paging breaks rank ties by id" do
+    # every fixture matches "image" once, so ts_rank ties across the board
+    ids = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 20).call.map(&:id)
+
+    assert_equal ids.sort, ids
+  end
+
+  test "vector offset pages continue the ranking and tie on id" do
+    query_embedding = ImageEmbedding.new(
+      image_core: image_cores(:one),
+      snippet: "reaction",
+      embedding: image_embeddings(:one).embedding
+    )
+
+    ImageEmbedding.stub(:new, query_embedding) do
+      all_ids = ImageSearchQuery.new(query: "reaction", mode: "vector", limit: 20).call.map(&:id)
+      first = ImageSearchQuery.new(query: "reaction", mode: "vector", limit: 2).call.map(&:id)
+      second = ImageSearchQuery.new(query: "reaction", mode: "vector", limit: 2, offset: 2).call.map(&:id)
+
+      # fixture embeddings are parallel vectors: every distance ties, so id decides
+      assert_equal 3, all_ids.length
+      assert_equal all_ids.sort, all_ids
+      assert_equal all_ids, first + second
+    end
+  end
+
+  test "vector neighbors skip the requested number of distinct memes" do
+    query_embedding = ImageEmbedding.new(
+      image_core: image_cores(:one),
+      snippet: "query",
+      embedding: [ 1.0 ] + Array.new(383, 0.0)
+    )
+    ImageEmbedding.delete_all
+    [ :one, :two, :three ].each_with_index do |name, index|
+      2.times do |chunk|
+        ImageEmbedding.create!(
+          image_core: image_cores(name),
+          snippet: "chunk #{chunk}",
+          embedding: [ 1.0 - (index * 0.1), index * 0.1 + chunk * 0.01 ] + Array.new(382, 0.0)
+        )
+      end
+    end
+
+    page = query_embedding.get_neighbor_image_core_ids(limit: 2, offset: 1)
+
+    assert_equal [ image_cores(:two).id, image_cores(:three).id ], page
+  end
+
+  test "page reports whether more results exist past the limit" do
+    page = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 3).page
+    assert_equal 3, page.results.length
+    assert page.more
+
+    page = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 2, offset: 2).page
+    assert_equal 2, page.results.length
+    assert_not page.more
+  end
+
+  test "clamps a negative offset to zero" do
+    first = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 2).call
+    negative = ImageSearchQuery.new(query: "image", mode: "keyword", limit: 2, offset: -5).call
+
+    assert_equal first, negative
   end
 end

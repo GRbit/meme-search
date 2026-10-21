@@ -6,6 +6,7 @@ module Api
       QUERY_MAX_LENGTH = 200
       TAG_MAX_LENGTH = 20
       TAG_MAX_COUNT = 10
+      MAX_OFFSET = 200
       ALLOWED_MODES = %w[keyword vector].freeze
 
       rate_limit to: 60, within: 1.minute, by: -> { current_api_token&.id || request.remote_ip },
@@ -16,12 +17,14 @@ module Api
         return unless require_scope!("search:read")
         return unless validate_search_params
 
-        results = ImageSearchQuery.new(
+        page = ImageSearchQuery.new(
           query: params[:q],
           mode: mode,
           selected_tag_names: requested_tags,
-          limit: limit
-        ).call
+          limit: limit,
+          offset: offset
+        ).page
+        results = page.results
         preload_tags(results)
 
         render json: {
@@ -31,8 +34,9 @@ module Api
             mode: mode,
             tags: requested_tags,
             limit: limit,
+            offset: offset,
             count: results.length
-          }
+          }.merge(next_offset_meta(page))
         }
       end
 
@@ -68,6 +72,16 @@ module Api
             return false
           end
 
+          if params[:offset].present? &&
+              (parsed_offset.nil? || !parsed_offset.between?(0, MAX_OFFSET))
+            render_api_error(
+              :invalid_offset,
+              "offset must be an integer between 0 and #{MAX_OFFSET}.",
+              :unprocessable_entity
+            )
+            return false
+          end
+
           return true if ALLOWED_MODES.include?(mode)
 
           render_api_error(:invalid_mode, "mode must be keyword or vector.", :unprocessable_entity)
@@ -85,6 +99,24 @@ module Api
 
         def parsed_limit
           @parsed_limit ||= Integer(params[:limit].presence || ImageSearchQuery::DEFAULT_RESULT_LIMIT, exception: false)
+        end
+
+        def offset
+          parsed_offset || 0
+        end
+
+        def parsed_offset
+          return @parsed_offset if defined?(@parsed_offset)
+
+          @parsed_offset = Integer(params[:offset].presence || 0, exception: false)
+        end
+
+        # A next_offset past MAX_OFFSET would be rejected on the follow-up request, so omit it
+        def next_offset_meta(page)
+          next_offset = offset + limit
+          return {} unless page.more && next_offset <= MAX_OFFSET
+
+          { next_offset: next_offset }
         end
 
         def requested_tags

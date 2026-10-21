@@ -79,6 +79,75 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "pages through results with offset and reports next_offset" do
+    get api_v1_search_url,
+      params: { q: "image", limit: 2 },
+      headers: authorization_header
+    first = response.parsed_body
+    assert_equal 0, first.dig("meta", "offset")
+    assert_equal 2, first.dig("meta", "next_offset")
+
+    get api_v1_search_url,
+      params: { q: "image", limit: 2, offset: first.dig("meta", "next_offset") },
+      headers: authorization_header
+    second = response.parsed_body
+    assert_response :success
+    assert_equal 2, second.dig("meta", "offset")
+    assert_equal 2, second.dig("meta", "count")
+    assert_not second.fetch("meta").key?("next_offset")
+
+    ids = (first["data"] + second["data"]).map { |meme| meme["id"] }
+    assert_equal 4, ids.uniq.length
+  end
+
+  test "offset past the end returns an empty page without next_offset" do
+    get api_v1_search_url,
+      params: { q: "image", offset: 200 },
+      headers: authorization_header
+
+    assert_response :success
+    assert_empty response.parsed_body["data"]
+    assert_not response.parsed_body.fetch("meta").key?("next_offset")
+  end
+
+  test "offset works in vector mode" do
+    query_embedding = ImageEmbedding.new(
+      image_core: image_cores(:one),
+      snippet: "reaction",
+      embedding: image_embeddings(:one).embedding
+    )
+
+    ImageEmbedding.stub(:new, query_embedding) do
+      get api_v1_search_url,
+        params: { q: "reaction", mode: "vector", limit: 2, offset: 2 },
+        headers: authorization_header
+    end
+
+    assert_response :success
+    assert_equal 2, response.parsed_body.dig("meta", "offset")
+    assert_equal 1, response.parsed_body.dig("data").length
+  end
+
+  test "omits next_offset when it would exceed the offset maximum" do
+    get api_v1_search_url,
+      params: { q: "image", limit: 2, offset: Api::V1::SearchController::MAX_OFFSET },
+      headers: authorization_header
+
+    assert_response :success
+    assert_not response.parsed_body.fetch("meta").key?("next_offset")
+  end
+
+  test "rejects offsets outside the documented contract" do
+    [ -1, Api::V1::SearchController::MAX_OFFSET + 1, "many", "1.5" ].each do |invalid_offset|
+      get api_v1_search_url,
+        params: { q: "bunny", offset: invalid_offset },
+        headers: authorization_header
+
+      assert_response :unprocessable_entity
+      assert_equal "invalid_offset", response.parsed_body.dig("error", "code")
+    end
+  end
+
   test "accepts repeated tag parameters" do
     get "#{api_v1_search_url}?q=image&tag=tag_one&tag=tag_two",
       headers: authorization_header
