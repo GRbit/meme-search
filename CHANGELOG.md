@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+Web UI fix:
+
+- Images in nested library folders (for example an image path named
+  `telegram/grbit`) now load in the web UI. Image URLs were built from the last
+  path segment only and returned 404. The URL now keeps every segment, escapes
+  each one (spaces, `#`, `?`, `%`, non-ASCII), and no longer contains a double
+  slash after the host.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:
