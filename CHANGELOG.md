@@ -14,7 +14,17 @@ Search inside folders:
 - Fixed the Paths toggle lowercasing folder names, which made folders with
   uppercase letters impossible to filter by in the gallery.
 
-This change does not change the database schema or Search API contract.
+Search API v1 folders (additive, existing fields and bounds unchanged):
+
+- `GET /api/v1/search` accepts a repeatable `folder` parameter (at most 10
+  exact library folder names; unknown names return `422 invalid_folder`) and
+  echoes the applied folders in `meta.folders`.
+- Meme objects have an optional `folder` field: the library folder name
+  relative to the memes root, never a filesystem path.
+- `GET /api/v1/folders` lists every library folder with its meme count,
+  including empty folders, under the `search:read` scope.
+
+These changes do not change the database schema.
 
 ## [2.3.2] - 2026-08-04
 

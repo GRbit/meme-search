@@ -326,7 +326,8 @@ Once registered in the app, your memes are ready for indexing / tagging / etc.,!
 
 ### Search API and local integrations
 
-Search, inspect metadata, and fetch authorized media through the stable,
+Search (optionally inside library folders), list folders, inspect metadata,
+and fetch authorized media through the stable,
 read-only `/api/v1` contract—without giving clients PostgreSQL credentials,
 Docker-network access, schema knowledge, or filesystem paths.
 
