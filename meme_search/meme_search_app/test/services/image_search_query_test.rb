@@ -140,6 +140,126 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
     assert_operator sql_queries.length, :<=, 3, sql_queries.join("\n")
   end
 
+  test "filters keyword results by any selected folder" do
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_path_names: [ image_paths(:two).name ]
+    ).call
+
+    assert_equal [ image_cores(:three).id, image_cores(:four).id ].sort, results.map(&:id).sort
+  end
+
+  test "matches any of several selected folders" do
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_path_names: [ image_paths(:one).name, image_paths(:two).name ]
+    ).call
+
+    assert_equal image_cores(:one, :two, :three, :four).map(&:id).sort, results.map(&:id).sort
+  end
+
+  test "requires both a selected folder and a selected tag" do
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_path_names: [ image_paths(:one).name ],
+      selected_tag_names: [ "tag_two" ]
+    ).call
+
+    assert_equal [ image_cores(:two) ], results
+
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_path_names: [ image_paths(:two).name ],
+      selected_tag_names: [ "tag_one" ]
+    ).call
+
+    assert_empty results
+  end
+
+  test "an unknown folder name matches nothing" do
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_path_names: [ "no_such_folder" ]
+    ).call
+
+    assert_empty results
+  end
+
+  test "filters keyword results by folder before ranking" do
+    crowd = image_paths(:one)
+    target_path = image_paths(:two)
+    ImageSearchQuery::MAX_RESULT_LIMIT.times do |index|
+      ImageCore.create!(image_path: crowd, name: "crowd_#{index}.jpg", description: "zebra zebra zebra", status: :not_started)
+    end
+    target = ImageCore.create!(image_path: target_path, name: "target.jpg", description: "a lone zebra", status: :not_started)
+
+    global = ImageSearchQuery.new(query: "zebra", mode: "keyword", limit: ImageSearchQuery::MAX_RESULT_LIMIT).call
+    assert_not_includes global, target
+
+    filtered = ImageSearchQuery.new(
+      query: "zebra",
+      mode: "keyword",
+      selected_path_names: [ target_path.name ],
+      limit: ImageSearchQuery::MAX_RESULT_LIMIT
+    ).call
+    assert_equal [ target ], filtered
+  end
+
+  test "filters vector results by folder and tag" do
+    query_vector = [ 1.0 ] + Array.new(383, 0.0)
+    image_cores(:one, :two, :three).each do |image_core|
+      ImageEmbedding.create!(image_core: image_core, snippet: "snippet", embedding: query_vector)
+    end
+
+    with_query_vector(query_vector) do
+      results = ImageSearchQuery.new(
+        query: "reaction",
+        mode: "vector",
+        selected_path_names: [ image_paths(:one).name ]
+      ).call
+      assert_equal image_cores(:one, :two).map(&:id).sort, results.map(&:id).sort
+
+      results = ImageSearchQuery.new(
+        query: "reaction",
+        mode: "vector",
+        selected_path_names: [ image_paths(:one).name ],
+        selected_tag_names: [ "tag_two" ]
+      ).call
+      assert_equal [ image_cores(:two) ], results
+    end
+  end
+
+  test "filters vector results by folder before ranking" do
+    crowd = image_paths(:one)
+    target_path = image_paths(:two)
+    query_vector = [ 1.0 ] + Array.new(383, 0.0)
+    ImageSearchQuery::MAX_RESULT_LIMIT.times do |index|
+      image_core = ImageCore.create!(image_path: crowd, name: "crowd_#{index}.jpg", description: "crowd", status: :not_started)
+      ImageEmbedding.create!(image_core: image_core, snippet: "crowd", embedding: query_vector)
+    end
+    target = ImageCore.create!(image_path: target_path, name: "target.jpg", description: "target", status: :not_started)
+    ImageEmbedding.create!(image_core: target, snippet: "target", embedding: [ 0.1, 0.9 ] + Array.new(382, 0.0))
+
+    with_query_vector(query_vector) do
+      global = ImageSearchQuery.new(query: "q", mode: "vector", limit: ImageSearchQuery::MAX_RESULT_LIMIT).call
+      assert_not_includes global, target
+
+      filtered = ImageSearchQuery.new(
+        query: "q",
+        mode: "vector",
+        selected_path_names: [ target_path.name ],
+        limit: ImageSearchQuery::MAX_RESULT_LIMIT
+      ).call
+      assert_equal target, filtered.first
+      assert filtered.all? { |image_core| image_core.image_path_id == target_path.id }
+    end
+  end
+
   test "returns no results for an unsupported mode" do
     results = ImageSearchQuery.new(query: "bunny", mode: "unsupported").call
 
@@ -151,4 +271,13 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
 
     assert_operator results.length, :<=, ImageSearchQuery::MAX_RESULT_LIMIT
   end
+
+  private
+
+    # Keeps the real neighbor SQL but skips the embedding model.
+    def with_query_vector(vector, &block)
+      query_embedding = ImageEmbedding.new(image_core: image_cores(:one), snippet: "query", embedding: vector)
+      query_embedding.define_singleton_method(:compute_embedding) { vector }
+      ImageEmbedding.stub(:new, query_embedding, &block)
+    end
 end
