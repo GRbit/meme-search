@@ -75,7 +75,7 @@ bin/rails api_tokens:revoke PREFIX="ms_abcd1234"
 Use a separate token per integration so one client can be revoked without
 interrupting the others. Available v1 scopes are:
 
-- `search:read` — search and retrieve one meme's metadata
+- `search:read` — search, list tags, and retrieve one meme's metadata
 - `media:read` — stream the original media bytes
 
 There are no write, upload, tag-editing, settings, or administration scopes in
@@ -149,6 +149,23 @@ curl http://127.0.0.1:3000/api/v1/memes/42/content \
   --header "Authorization: Bearer $MEME_SEARCH_API_TOKEN" \
   --output ship-it.gif
 ```
+
+`GET /api/v1/tags` lists the tag names that at least one meme carries, so a
+client can offer choices instead of free text. It needs `search:read`, shares
+the 60 requests per token per minute limit and returns every tag in one
+response, ordered by name:
+
+```json
+{
+  "data": [
+    { "name": "reaction", "meme_count": 12 },
+    { "name": "work", "meme_count": 3 }
+  ],
+  "meta": { "count": 2 }
+}
+```
+
+Tags without memes are not listed. Pass a listed `name` as `tag` to search.
 
 `GET /api/v1/memes/:id` returns the same metadata shape for a single result.
 Content responses are private, use `X-Content-Type-Options: nosniff`, and

@@ -78,6 +78,29 @@ paths:
           $ref: "#/components/responses/UnprocessableEntity"
         "429":
           $ref: "#/components/responses/RateLimited"
+  /api/v1/tags:
+    get:
+      summary: List tag names with meme counts
+      description: Only tags carried by at least one meme are listed, ordered by name.
+      operationId: listTags
+      x-required-scope: search:read
+      x-rate-limit:
+        requests: 60
+        window-seconds: 60
+        key: authenticated-token
+      responses:
+        "200":
+          description: Tags in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /api/v1/memes/{id}:
     get:
       summary: Retrieve one meme's metadata
@@ -218,6 +241,32 @@ components:
               type: integer
               minimum: 0
               maximum: 20
+    TagListResponse:
+      type: object
+      additionalProperties: true
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [name, meme_count]
+            properties:
+              name:
+                type: string
+                maxLength: 20
+              meme_count:
+                type: integer
+                minimum: 1
+        meta:
+          type: object
+          additionalProperties: true
+          required: [count]
+          properties:
+            count:
+              type: integer
+              minimum: 0
     ErrorResponse:
       type: object
       additionalProperties: true
