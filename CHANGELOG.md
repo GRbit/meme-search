@@ -12,6 +12,15 @@ Web UI fix:
   each one (spaces, `#`, `?`, `%`, non-ASCII), and no longer contains a double
   slash after the host.
 
+Image paths:
+
+- New "Include subfolders" option on a directory path. When the path is saved
+  or scanned, every direct subfolder (one level, hidden and symlinked folders
+  skipped) is registered as its own path named `<parent>/<child>`, inherits the
+  parent's scan frequency and is scanned in the same pass. Existing child paths
+  are left alone, and a vanished subfolder's path is not deleted. Off by
+  default; adds the `image_paths.include_subfolders` column (run migrations).
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

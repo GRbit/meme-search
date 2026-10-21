@@ -144,6 +144,8 @@ Features of Meme Search include:
 
    Organize your memes across multiple subdirectories—no need to store everything in one folder.
 
+   Turn on "Include subfolders" for a directory path to register each of its direct subfolders as its own path when it is scanned (one level, hidden and symlinked folders skipped), for example one folder per user written by an integration.
+
 7. **New Organizational Tools**
 
    Filter by tags, directory paths, and description embeddings, plus toggle between keyword and vector search for more control.
