@@ -75,7 +75,7 @@ bin/rails api_tokens:revoke PREFIX="ms_abcd1234"
 Use a separate token per integration so one client can be revoked without
 interrupting the others. Available v1 scopes are:
 
-- `search:read` — search and retrieve one meme's metadata
+- `search:read` — search, list folders, and retrieve one meme's metadata
 - `media:read` — stream the original media bytes
 
 There are no write, upload, tag-editing, settings, or administration scopes in
@@ -111,8 +111,8 @@ Each repeated value is one exact tag; commas are not separators, so clients
 must percent-encode commas that are part of a tag name.
 `folder` may be repeated (at most 10) and limits results to memes in any of the
 given library folders. A folder is named relative to the memes root, exactly as
-the `folder` response field returns it (case-sensitive, `/` separates nested
-folders); it is never a filesystem path. Unknown names return `422 invalid_folder`. With
+`GET /api/v1/folders` lists it and the `folder` response field returns it
+(case-sensitive, `/` separates nested folders); it is never a filesystem path. Unknown names return `422 invalid_folder`. With
 both `folder` and `tag`, a meme must be in one of the folders and carry one of
 the tags. `meta.folders` echoes the applied folders (`[]` without a filter), so
 a client can detect an older server that ignored `folder` and searched the
@@ -162,6 +162,27 @@ curl http://127.0.0.1:3000/api/v1/memes/42/content \
   --output ship-it.gif
 ```
 
+`GET /api/v1/folders` lists the library folders, so a client can offer choices
+instead of free text. It needs `search:read`, returns every folder in one
+response ordered by name, and has its own limit of 60 requests per token per
+minute, counted separately from search:
+
+```json
+{
+  "data": [
+    { "name": "direct-uploads", "meme_count": 0 },
+    { "name": "work/reactions", "meme_count": 12 }
+  ],
+  "meta": { "count": 2 }
+}
+```
+
+`name` is the folder name relative to the memes root, never a filesystem path;
+pass it unchanged as `folder` to search. Folders without memes are listed with
+`meme_count: 0` because they are valid `folder` values: a newly registered or
+not yet scanned folder can be searched (and returns no results) rather than
+rejected.
+
 `GET /api/v1/memes/:id` returns the same metadata shape for a single result.
 Content responses are private, use `X-Content-Type-Options: nosniff`, and
 preserve the original bytes. Missing, unsafe, symlinked, or out-of-library
@@ -182,7 +203,7 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
 | `422` | query, mode, tag, folder, or limit violates the documented contract |
-| `429` | this authenticated token exceeded 60 searches per minute |
+| `429` | this authenticated token exceeded 60 searches or 60 folder listings per minute |
 
 The machine-readable contract is available in
 [`search-api-openapi.yml`](search-api-openapi.yml).
