@@ -243,6 +243,36 @@ class ImageCoresControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "search page offers the folder filter" do
+    get search_image_cores_url
+
+    assert_select "#path_toggle input[name=selected_path_names]"
+    assert_select "#path_toggle input[type=checkbox][value=?]", image_paths(:two).name
+  end
+
+  test "search_items should filter by folders" do
+    post search_items_image_cores_url, params: {
+      query: "image",
+      checkbox_value: "0",
+      selected_path_names: image_paths(:two).name
+    }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal image_cores(:three, :four).map(&:id).sort, assigns(:image_cores).map(&:id).sort
+  end
+
+  test "search_items should combine folders and tags" do
+    post search_items_image_cores_url, params: {
+      query: "image",
+      checkbox_value: "0",
+      selected_path_names: "#{image_paths(:one).name}, unknown_folder",
+      selected_tag_names: "tag_two"
+    }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ image_cores(:two).id ], assigns(:image_cores).map(&:id)
+  end
+
   test "search_items should return no_search partial for blank query" do
     post search_items_image_cores_url, params: {
       query: "",
