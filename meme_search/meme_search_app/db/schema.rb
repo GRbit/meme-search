@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_28_000000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_22_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -54,6 +54,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_28_000000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["image_path_id"], name: "index_image_cores_on_image_path_id"
+    t.index ["updated_at", "id"], name: "index_image_cores_on_updated_at_and_id"
   end
 
   create_table "image_description_bulk_operations", force: :cascade do |t|

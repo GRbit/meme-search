@@ -167,6 +167,63 @@ files return the common 404 JSON envelope rather than a filesystem path.
 Unreadable files and files removed concurrently before streaming use the same
 404 envelope.
 
+## List and sync memes
+
+`GET /api/v1/memes` lists the whole collection in change order, so a client can
+mirror it and later poll for new and changed memes. It uses the `search:read`
+scope and returns meme objects in exactly the shape search returns.
+
+```sh
+curl --get http://127.0.0.1:3000/api/v1/memes \
+  --header "Authorization: Bearer $MEME_SEARCH_API_TOKEN" \
+  --data "limit=100"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "filename": "ship-it.gif",
+      "description": "A celebratory reaction after a successful deploy",
+      "tags": ["reaction", "work"],
+      "media_type": "image/gif",
+      "content_url": "/api/v1/memes/42/content",
+      "description_status": "ready"
+    }
+  ],
+  "meta": {
+    "limit": 100,
+    "count": 1,
+    "has_more": false,
+    "next_cursor": "WyIyMDI2LTEwLTIyVDA5OjMwOjAwLjEyMzQ1NloiLDQyXQ"
+  }
+}
+```
+
+- Memes are ordered by their last change, then by id, so memes changed in the
+  same instant are neither skipped nor repeated across pages.
+- `limit` must be from 1-100 and defaults to 50.
+- Omit `cursor` for a full listing from the start. Otherwise pass a
+  `meta.next_cursor` value exactly as received; the cursor is opaque and its
+  format may change. Anything else is rejected with `422 invalid_cursor`.
+- While `meta.has_more` is `true`, request the next page with
+  `meta.next_cursor`. Store the last `next_cursor` you received and poll with
+  it later: the response contains the memes created or changed since then.
+- `next_cursor` is absent only when the page is empty, which means nothing is
+  newer; keep the cursor you already have.
+- A meme counts as changed when its description, generation status, tags, or
+  embeddings change. Renaming a tag in Settings does not mark its memes as
+  changed.
+- Deleted memes are not reported. A client that mirrors the collection learns
+  about a deletion from a `404` on `GET /api/v1/memes/:id` or its content URL.
+- Change times are taken when a change is written. A change that is still being
+  saved while you poll can carry a time just before the cursor you receive and
+  then be missed until that meme changes again; a client that needs certainty
+  can occasionally repeat a full listing.
+- Listing is limited to 60 requests per token per minute, counted separately
+  from search.
+
 Library rescans do not index or serve symlinked/unsafe entries. If an older
 installation already has metadata for an unsafe-but-present entry, a rescan
 preserves that record and its tags, embeddings, and generation history while
@@ -179,8 +236,8 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `401` | bearer token is missing, invalid, expired, or revoked |
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
-| `422` | query, mode, tag, or limit violates the documented contract |
-| `429` | this authenticated token exceeded 60 searches per minute |
+| `422` | query, mode, tag, limit, or cursor violates the documented contract |
+| `429` | this authenticated token exceeded 60 searches, or 60 listing requests, per minute |
 
 The machine-readable contract is available in
 [`search-api-openapi.yml`](search-api-openapi.yml).
@@ -236,6 +293,10 @@ bin/rails db:migrate:status
 A fresh database receives the same schema through `db:prepare`; an existing
 database receives the forward-only `api_tokens` migration. The migration adds
 no user/library ownership model and does not authenticate existing web routes.
+
+The meme listing adds an index on `image_cores (updated_at, id)` through
+`20261022000000 Add updated at id index to image cores`, applied the same way by
+`db:prepare`. It changes no data.
 
 ## Relevance benchmark
 
@@ -339,7 +400,7 @@ reviewed.
   expired or was revoked. The raw value cannot be recovered from its prefix.
 - `403 forbidden`: add the needed read scope by creating a replacement token;
   scopes on an existing token are intentionally not mutated.
-- `422 invalid_*`: compare query/mode/tags/limit to the bounds above and to the
+- `422 invalid_*`: compare query/mode/tags/limit/cursor to the bounds above and to the
   machine-readable contract.
 - `429 rate_limited`: wait for the per-token minute window; do not share one
   token across clients to bypass attribution.

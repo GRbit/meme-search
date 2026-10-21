@@ -195,6 +195,8 @@ class ImageCore < ApplicationRecord
         snippets_hash.map { |hash| ImageEmbedding.new(hash).save! }
       end
     end
+    # New embeddings can turn the API description_status ready, so the change feed must see them.
+    touch if persisted?
   end
 
   private

@@ -62,6 +62,22 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "keeps listing bounds and scope aligned with the server" do
+    listing = operation("/api/v1/memes")
+    parameters = listing.fetch("parameters").index_by { |parameter| parameter.fetch("name") }
+    list_meta = @contract.dig("components", "schemas", "MemeListResponse", "properties", "meta")
+
+    assert_equal "search:read", listing.fetch("x-required-scope")
+    assert_equal 1, parameters.dig("limit", "schema", "minimum")
+    assert_equal Api::V1::MemesController::LIST_MAX_LIMIT, parameters.dig("limit", "schema", "maximum")
+    assert_equal Api::V1::MemesController::LIST_DEFAULT_LIMIT, parameters.dig("limit", "schema", "default")
+    assert_equal Api::V1::MemesController::CURSOR_MAX_LENGTH, parameters.dig("cursor", "schema", "maxLength")
+    assert_equal Api::V1::MemesController::LIST_MAX_LIMIT, list_meta.dig("properties", "count", "maximum")
+    assert_equal %w[count has_more limit], list_meta.fetch("required").sort
+    assert_equal({ "requests" => 60, "window-seconds" => 60, "key" => "authenticated-token" },
+      listing.fetch("x-rate-limit"))
+  end
+
   test "requires current success fields while permitting additive v1 fields" do
     meme_schema = @contract.dig("components", "schemas", "Meme")
     search_schema = @contract.dig("components", "schemas", "SearchResponse")
@@ -101,6 +117,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
 
   test "documents the exact status matrix and supported media types" do
     assert_equal %w[200 401 403 422 429], search_operation.fetch("responses").keys.sort
+    assert_equal %w[200 401 403 422 429], operation("/api/v1/memes").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404], operation("/api/v1/memes/{id}").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404],
       operation("/api/v1/memes/{id}/content").fetch("responses").keys.sort
@@ -129,6 +146,23 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       headers: authorization_header
     assert_response :success
     assert_schema_instance("SearchResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { limit: 2 }, headers: authorization_header
+    assert_response :success
+    assert_schema_instance("MemeListResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { cursor: response.parsed_body.dig("meta", "next_cursor"), limit: 100 },
+      headers: authorization_header
+    assert_response :success
+    get api_v1_memes_url, params: { cursor: response.parsed_body.dig("meta", "next_cursor") },
+      headers: authorization_header
+    assert_response :success
+    assert_empty response.parsed_body["data"]
+    assert_schema_instance("MemeListResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { cursor: "bogus!" }, headers: authorization_header
+    assert_response :unprocessable_entity
+    assert_schema_instance("ErrorResponse", response.parsed_body)
 
     get api_v1_search_url, params: { q: "bunny" }
     assert_response :unauthorized
@@ -250,6 +284,8 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     end
 
     def schema_type?(type, value)
+      return value == true || value == false if type == "boolean"
+
       ruby_type = {
         "array" => Array,
         "integer" => Integer,

@@ -71,6 +71,46 @@ paths:
           $ref: "#/components/responses/UnprocessableEntity"
         "429":
           $ref: "#/components/responses/RateLimited"
+  /api/v1/memes:
+    get:
+      summary: List memes in change order for sync and polling
+      description: Ordered by last change, then id. Follow meta.next_cursor while meta.has_more is true; store the last next_cursor and poll with it later to receive new and changed memes. Deleted memes are not reported.
+      operationId: listMemes
+      x-required-scope: search:read
+      x-rate-limit:
+        requests: 60
+        window-seconds: 60
+        key: authenticated-token
+      parameters:
+        - name: cursor
+          in: query
+          description: Opaque value from a previous meta.next_cursor. Omit it for a full listing from the start.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: One page of memes in change order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemeListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /api/v1/memes/{id}:
     get:
       summary: Retrieve one meme's metadata
@@ -212,6 +252,33 @@ components:
               type: integer
               minimum: 0
               maximum: 20
+    MemeListResponse:
+      type: object
+      additionalProperties: true
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meme"
+        meta:
+          type: object
+          additionalProperties: true
+          required: [limit, count, has_more]
+          properties:
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 100
+            count:
+              type: integer
+              minimum: 0
+              maximum: 100
+            has_more:
+              type: boolean
+            next_cursor:
+              type: string
+              description: Absent when the page is empty, so a client keeps the cursor it already has.
     ErrorResponse:
       type: object
       additionalProperties: true
@@ -250,13 +317,13 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     UnprocessableEntity:
-      description: Invalid search input
+      description: Invalid search or listing input
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     RateLimited:
-      description: Per-token search rate limit exceeded
+      description: Per-token search or listing rate limit exceeded
       content:
         application/json:
           schema:
