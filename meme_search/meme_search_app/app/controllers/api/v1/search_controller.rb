@@ -20,7 +20,8 @@ module Api
           query: params[:q],
           mode: mode,
           selected_tag_names: requested_tags,
-          limit: limit
+          limit: limit,
+          tag_match: tag_match
         ).call
         preload_tags(results)
 
@@ -30,6 +31,7 @@ module Api
             query: params[:q],
             mode: mode,
             tags: requested_tags,
+            tag_match: tag_match,
             limit: limit,
             count: results.length
           }
@@ -68,10 +70,19 @@ module Api
             return false
           end
 
-          return true if ALLOWED_MODES.include?(mode)
+          unless ALLOWED_MODES.include?(mode)
+            render_api_error(:invalid_mode, "mode must be keyword or vector.", :unprocessable_entity)
+            return false
+          end
 
-          render_api_error(:invalid_mode, "mode must be keyword or vector.", :unprocessable_entity)
+          return true if ImageSearchQuery::TAG_MATCH_MODES.include?(tag_match)
+
+          render_api_error(:invalid_tag_match, "tag_match must be any or all.", :unprocessable_entity)
           false
+        end
+
+        def tag_match
+          params[:tag_match].presence || "any"
         end
 
         def mode

@@ -42,6 +42,7 @@
           "tags": ["work"],
           "limit": 5,
           "count": 1,
+          "tag_match": "any",
           "future_meta_field": {
             "cursor": "opaque"
           }

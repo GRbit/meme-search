@@ -105,7 +105,11 @@ curl --get http://127.0.0.1:3000/api/v1/search \
 ```
 
 `q` is required and limited to 200 characters. `mode` is `keyword` (the
-default) or `vector`. `tag` may be repeated and matches any selected tag.
+default) or `vector`. `tag` may be repeated; by default a meme matches when it
+has any selected tag. Add `tag_match=all` to require every selected tag
+(`any` is the default and today's behavior; other values return `422
+invalid_tag_match`). `meta.tag_match` echoes the applied value, so a client can
+detect an older server that ignored the parameter.
 Each repeated value is one exact tag; commas are not separators, so clients
 must percent-encode commas that are part of a tag name.
 `limit` must be from 1–20. Search is limited to 60 requests per token per
@@ -130,6 +134,7 @@ required field requires a new API version.
     "query": "production incident",
     "mode": "keyword",
     "tags": ["reaction"],
+    "tag_match": "any",
     "limit": 5,
     "count": 1
   }
@@ -164,7 +169,7 @@ Errors use `{"error":{"code":"...","message":"..."}}`:
 | `401` | bearer token is missing, invalid, expired, or revoked |
 | `403` | valid token lacks `search:read` or `media:read` |
 | `404` | meme or safely accessible media does not exist |
-| `422` | query, mode, tag, or limit violates the documented contract |
+| `422` | query, mode, tag, tag_match, or limit violates the documented contract |
 | `429` | this authenticated token exceeded 60 searches per minute |
 
 The machine-readable contract is available in
@@ -324,7 +329,7 @@ reviewed.
   expired or was revoked. The raw value cannot be recovered from its prefix.
 - `403 forbidden`: add the needed read scope by creating a replacement token;
   scopes on an existing token are intentionally not mutated.
-- `422 invalid_*`: compare query/mode/tags/limit to the bounds above and to the
+- `422 invalid_*`: compare query/mode/tags/tag_match/limit to the bounds above and to the
   machine-readable contract.
 - `429 rate_limited`: wait for the per-token minute window; do not share one
   token across clients to bypass attribution.

@@ -46,6 +46,8 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal Api::V1::SearchController::TAG_MAX_COUNT, parameters.dig("tag", "schema", "maxItems")
     assert_equal Api::V1::SearchController::TAG_MAX_LENGTH,
       parameters.dig("tag", "schema", "items", "maxLength")
+    assert_equal ImageSearchQuery::TAG_MATCH_MODES, parameters.dig("tag_match", "schema", "enum")
+    assert_equal "any", parameters.dig("tag_match", "schema", "default")
     assert_equal(
       ImageSearchQuery::MAX_RESULT_LIMIT,
       parameters.dig("limit", "schema", "maximum")

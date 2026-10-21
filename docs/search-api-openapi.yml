@@ -49,6 +49,13 @@ paths:
               maxLength: 20
           style: form
           explode: true
+        - name: tag_match
+          in: query
+          description: With several tags, `any` returns memes that have at least one of them and `all` only memes that have every one of them. Ignored without tags.
+          schema:
+            type: string
+            enum: [any, all]
+            default: any
         - name: limit
           in: query
           schema:
@@ -200,6 +207,9 @@ components:
               type: array
               items:
                 type: string
+            tag_match:
+              type: string
+              enum: [any, all]
             limit:
               type: integer
               minimum: 1

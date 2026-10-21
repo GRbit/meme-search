@@ -106,6 +106,50 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "tag_match defaults to any and is echoed in meta" do
+    get "#{api_v1_search_url}?q=image&tag=tag_one&tag=tag_two", headers: authorization_header
+
+    assert_response :success
+    assert_equal "any", response.parsed_body.dig("meta", "tag_match")
+    assert_equal 3, response.parsed_body.dig("meta", "count")
+  end
+
+  test "tag_match all requires every tag before the limit" do
+    get "#{api_v1_search_url}?q=image&tag=tag_one&tag=tag_two&tag_match=all&limit=1",
+      headers: authorization_header
+
+    assert_response :success
+    assert_equal "all", response.parsed_body.dig("meta", "tag_match")
+    assert_equal [ image_cores(:two).id ], response.parsed_body.fetch("data").map { |item| item.fetch("id") }
+  end
+
+  test "tag_match all works in vector mode" do
+    query_embedding = Object.new
+    query_embedding.define_singleton_method(:compute_embedding) { Array.new(384, 0.5) }
+    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:|
+      image_core_ids.to_a.map(&:id)
+    end
+
+    ImageEmbedding.stub(:new, query_embedding) do
+      get "#{api_v1_search_url}?q=image&mode=vector&tag=tag_one&tag=tag_two&tag_match=all",
+        headers: authorization_header
+    end
+
+    assert_response :success
+    assert_equal [ image_cores(:two).id ], response.parsed_body.fetch("data").map { |item| item.fetch("id") }
+  end
+
+  test "rejects an unknown tag_match" do
+    [ "some", "ALL", "all,any" ].each do |value|
+      get api_v1_search_url,
+        params: { q: "image", tag: "tag_one", tag_match: value },
+        headers: authorization_header
+
+      assert_response :unprocessable_entity
+      assert_equal "invalid_tag_match", response.parsed_body.dig("error", "code")
+    end
+  end
+
   test "rejects excessive tag input" do
     query = ([ "q=bunny" ] + 11.times.map { |index| "tag=tag#{index}" }).join("&")
 
