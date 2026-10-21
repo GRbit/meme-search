@@ -33,6 +33,7 @@
             "tags": ["work"],
             "media_type": "image/jpeg",
             "content_url": "/api/v1/memes/7/content",
+            "description_status": "pending",
             "future_meme_field": "clients ignore this"
           }
         ],

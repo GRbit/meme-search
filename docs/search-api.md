@@ -123,7 +123,8 @@ required field requires a new API version.
       "description": "A celebratory reaction after a successful deploy",
       "tags": ["reaction", "work"],
       "media_type": "image/gif",
-      "content_url": "/api/v1/memes/42/content"
+      "content_url": "/api/v1/memes/42/content",
+      "description_status": "ready"
     }
   ],
   "meta": {
@@ -135,6 +136,20 @@ required field requires a new API version.
   }
 }
 ```
+
+Every meme object carries the optional `description_status` field, so a client
+can tell a saved meme from one that is searchable now:
+
+| Value | Meaning |
+| --- | --- |
+| `ready` | the meme has a non-empty description and its embeddings, so both keyword and vector search can find it |
+| `failed` | the last description generation failed and the meme has no description |
+| `pending` | anything else: no description yet, a generation queued or running, or a description whose embeddings are not computed yet |
+
+The status is derived from what is stored, not from the generation queue: a
+description typed by hand in the web UI counts as `ready` once its embeddings
+exist. Older servers omit the field. Clients must treat a missing field or an
+unknown value as `pending`.
 
 The relative `content_url` is deliberate. Fetch it from the same instance and
 send the same bearer token:

@@ -23,9 +23,10 @@ module Api
           limit: limit
         ).call
         preload_tags(results)
+        embedded_ids = MemeSerializer.embedded_image_core_ids(results)
 
         render json: {
-          data: results.map { |image_core| serialize(image_core) },
+          data: results.map { |image_core| serialize(image_core, embedded_ids) },
           meta: {
             query: params[:q],
             mode: mode,
@@ -109,10 +110,11 @@ module Api
           ).call
         end
 
-        def serialize(image_core)
+        def serialize(image_core, embedded_ids)
           MemeSerializer.new(
             image_core,
-            content_url: content_api_v1_meme_path(image_core)
+            content_url: content_api_v1_meme_path(image_core),
+            embedded: embedded_ids.include?(image_core.id)
           ).as_json
         end
     end

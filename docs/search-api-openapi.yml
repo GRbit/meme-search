@@ -177,6 +177,10 @@ components:
         content_url:
           type: string
           pattern: "^/api/v1/memes/[1-9][0-9]*/content$"
+        description_status:
+          type: string
+          enum: [pending, ready, failed]
+          description: Optional. ready when the meme has a non-empty description and embeddings (searchable in both modes), failed when the last generation failed and there is no description, pending otherwise. Older servers omit it; clients must treat unknown values as pending.
     SearchResponse:
       type: object
       additionalProperties: true

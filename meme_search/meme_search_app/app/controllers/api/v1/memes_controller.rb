@@ -11,7 +11,8 @@ module Api
         render json: {
           data: MemeSerializer.new(
             @image_core,
-            content_url: content_api_v1_meme_path(@image_core)
+            content_url: content_api_v1_meme_path(@image_core),
+            embedded: @image_core.image_embeddings.exists?
           ).as_json
         }
       end

@@ -37,6 +37,34 @@ class Api::V1::MemesControllerTest < ActionDispatch::IntegrationTest
     assert_nil response.parsed_body.dig("data", "image_path")
   end
 
+  test "reports description status from stored description and embeddings" do
+    cases = [
+      [ { description: nil, status: :not_started }, false, "pending" ],
+      [ { description: "", status: :done }, true, "pending" ],
+      [ { description: "has text", status: :done }, false, "pending" ],
+      [ { description: "typed by hand", status: :not_started }, true, "ready" ],
+      [ { description: "has text", status: :done }, true, "ready" ],
+      [ { description: "kept text", status: :failed }, true, "ready" ],
+      [ { description: "kept text", status: :failed }, false, "pending" ],
+      [ { description: nil, status: :failed }, false, "failed" ],
+      [ { description: nil, status: :in_queue }, false, "pending" ]
+    ]
+
+    cases.each do |attributes, embedded, expected|
+      @image_core.image_embeddings.delete_all
+      @image_core.update!(attributes)
+      if embedded
+        ImageEmbedding.create!(image_core: @image_core, snippet: "snippet", embedding: Array.new(384, 0.0))
+      end
+
+      get api_v1_meme_url(@image_core), headers: authorization_header
+
+      assert_response :success
+      assert_equal expected, response.parsed_body.dig("data", "description_status"),
+        "#{attributes.inspect} embedded=#{embedded}"
+    end
+  end
+
   test "streams content through the authenticated endpoint" do
     get content_api_v1_meme_url(@image_core), headers: authorization_header
 

@@ -68,11 +68,15 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     error_schema = @contract.dig("components", "schemas", "ErrorResponse")
     serialized_keys = Api::V1::MemeSerializer.new(
       image_cores(:one),
-      content_url: "/api/v1/memes/#{image_cores(:one).id}/content"
+      content_url: "/api/v1/memes/#{image_cores(:one).id}/content",
+      embedded: true
     ).as_json.keys.map(&:to_s)
 
-    assert_equal serialized_keys.sort, meme_schema.fetch("required").sort
+    assert_equal %w[content_url description filename id media_type tags],
+      meme_schema.fetch("required").sort
     assert_equal serialized_keys.sort, meme_schema.fetch("properties").keys.sort
+    assert_equal Api::V1::MemeSerializer::DESCRIPTION_STATUSES.sort,
+      meme_schema.dig("properties", "description_status", "enum").sort
     assert_equal true, meme_schema.fetch("additionalProperties")
     assert_equal %w[count limit mode query tags].sort,
       search_schema.dig("properties", "meta", "required").sort
