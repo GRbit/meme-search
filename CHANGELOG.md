@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- The Solid Queue worker thread count is configurable with `JOB_THREADS`
+  (default 3, unchanged). Set `JOB_THREADS=1` for an OpenAI-compatible server
+  that handles one request at a time, such as Ollama.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

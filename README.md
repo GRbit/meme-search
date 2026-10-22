@@ -248,6 +248,8 @@ Meme Search supports two providers for automatic meme descriptions:
 
 Descriptions from every provider are normalized to the app's description length limit before saving. Bulk generation queues durable Solid Queue background jobs for external providers so the web request does not wait on one API request per image.
 
+With `IMAGE_DESCRIPTION_PROVIDER=openai`, single and bulk generation both run as Solid Queue jobs, three at a time by default; set `JOB_THREADS=1` in `.env` when your OpenAI-compatible server (Ollama, llama.cpp, LM Studio) handles one request at a time, so queued requests do not hit the 60-second read timeout.
+
 When an external provider is selected, images chosen for description generation are sent to the configured API endpoint. Embeddings, metadata, and search remain local.
 
 For OpenAI-compatible mode, set these environment variables in your `.env` file:
