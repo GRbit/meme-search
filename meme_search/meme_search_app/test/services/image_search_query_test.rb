@@ -25,6 +25,68 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
     assert_equal expected_ids, results.map(&:id).sort
   end
 
+  test "tag_match all keeps only memes that carry every selected tag" do
+    results = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_tag_names: [ "tag_one", "tag_two" ],
+      tag_match: "all"
+    ).call
+
+    assert_equal [ image_cores(:two).id ], results.map(&:id)
+  end
+
+  test "tag_match all ignores duplicate tag names and finds nothing for an unknown tag" do
+    duplicated = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_tag_names: [ "tag_one", "tag_one" ],
+      tag_match: "all"
+    ).call
+    unknown = ImageSearchQuery.new(
+      query: "image",
+      mode: "keyword",
+      selected_tag_names: [ "tag_one", "no_such_tag" ],
+      tag_match: "all"
+    ).call
+
+    assert_equal [ image_cores(:one).id, image_cores(:two).id ].sort, duplicated.map(&:id).sort
+    assert_empty unknown
+  end
+
+  test "tag_match any is the default" do
+    explicit = ImageSearchQuery.new(
+      query: "image", mode: "keyword", selected_tag_names: [ "tag_one", "tag_two" ], tag_match: "any"
+    ).call
+    implicit = ImageSearchQuery.new(
+      query: "image", mode: "keyword", selected_tag_names: [ "tag_one", "tag_two" ]
+    ).call
+
+    assert_equal explicit.map(&:id).sort, implicit.map(&:id).sort
+    assert_equal 3, implicit.length
+  end
+
+  test "tag_match all restricts vector neighbor selection to memes with every tag" do
+    query_embedding = Object.new
+    captured = {}
+    query_embedding.define_singleton_method(:compute_embedding) { Array.new(384, 0.5) }
+    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:|
+      captured[:eligible_ids] = image_core_ids.to_a.map(&:id)
+      []
+    end
+
+    ImageEmbedding.stub(:new, query_embedding) do
+      ImageSearchQuery.new(
+        query: "reaction meme",
+        mode: "vector",
+        selected_tag_names: [ "tag_one", "tag_two" ],
+        tag_match: "all"
+      ).call
+    end
+
+    assert_equal [ image_cores(:two).id ], captured[:eligible_ids]
+  end
+
   test "filters keyword results before applying the result limit" do
     matching_tag = tag_names(:two)
     untagged = image_cores(:one)

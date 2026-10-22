@@ -13,13 +13,16 @@ class ImageSearchQuery
     same so than too very s
   ].freeze
 
-  # selected_tag_names and selected_path_names (exact ImagePath names) each match
-  # any of their entries; when both are given a meme has to satisfy both.
-  def initialize(query:, mode:, selected_tag_names: [], selected_path_names: [], limit: DEFAULT_RESULT_LIMIT)
+  TAG_MATCH_MODES = %w[any all].freeze
+
+  # selected_path_names (exact ImagePath names) match any of their entries; when tags and
+  # folders are both given a meme has to satisfy both.
+  def initialize(query:, mode:, selected_tag_names: [], selected_path_names: [], limit: DEFAULT_RESULT_LIMIT, tag_match: "any")
     @query = query.to_s
     @mode = mode.to_s
     @selected_tag_names = Array(selected_tag_names).compact_blank
     @selected_path_names = Array(selected_path_names).compact_blank
+    @tag_match = tag_match.to_s
     @limit = normalize_limit(limit)
   end
 
@@ -36,7 +39,7 @@ class ImageSearchQuery
 
   private
 
-    attr_reader :query, :mode, :selected_tag_names, :selected_path_names, :limit
+    attr_reader :query, :mode, :selected_tag_names, :selected_path_names, :limit, :tag_match
 
     def keyword_results
       relation = ImageCore.search_any_word(remove_stopwords(query))
@@ -74,9 +77,16 @@ class ImageSearchQuery
     end
 
     def tagged_image_core_ids
-      ImageCore
+      relation = ImageCore
         .joins(image_tags: :tag_name)
         .where(tag_names: { name: selected_tag_names })
+      return relation.select(:id) unless tag_match == "all"
+
+      # Distinct on both sides: repeated names in the request or a tag attached
+      # twice to one meme must not change the outcome.
+      relation
+        .group("image_cores.id")
+        .having("COUNT(DISTINCT tag_names.id) = ?", selected_tag_names.uniq.length)
         .select(:id)
     end
 

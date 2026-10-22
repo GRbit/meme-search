@@ -3,6 +3,7 @@ Rails.application.routes.draw do
     namespace :v1 do
       get "search", to: "search#index"
       get "folders", to: "folders#index"
+      get "tags", to: "tags#index"
       resources :memes, only: [ :show ] do
         get :content, on: :member
       end

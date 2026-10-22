@@ -60,6 +60,13 @@ paths:
               maxLength: 300
           style: form
           explode: true
+        - name: tag_match
+          in: query
+          description: With several tags, `any` returns memes that have at least one of them and `all` only memes that have every one of them. Ignored without tags.
+          schema:
+            type: string
+            enum: [any, all]
+            default: any
         - name: limit
           in: query
           schema:
@@ -99,6 +106,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FolderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/tags:
+    get:
+      summary: List tag names with meme counts
+      description: Only tags carried by at least one meme are listed, ordered by name.
+      operationId: listTags
+      x-required-scope: search:read
+      x-rate-limit:
+        requests: 60
+        window-seconds: 60
+        key: authenticated-token
+      responses:
+        "200":
+          description: Tags in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TagListResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -243,6 +273,9 @@ components:
               description: The applied folder filter; empty without one. Older v1 servers omit it and ignore `folder`.
               items:
                 type: string
+            tag_match:
+              type: string
+              enum: [any, all]
             limit:
               type: integer
               minimum: 1
@@ -270,6 +303,32 @@ components:
               meme_count:
                 type: integer
                 minimum: 0
+        meta:
+          type: object
+          additionalProperties: true
+          required: [count]
+          properties:
+            count:
+              type: integer
+              minimum: 0
+    TagListResponse:
+      type: object
+      additionalProperties: true
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [name, meme_count]
+            properties:
+              name:
+                type: string
+                maxLength: 20
+              meme_count:
+                type: integer
+                minimum: 1
         meta:
           type: object
           additionalProperties: true

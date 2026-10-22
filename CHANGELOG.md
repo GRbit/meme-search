@@ -70,6 +70,17 @@ Search API v1 folders (additive, existing fields and bounds unchanged):
 
 These changes do not change the database schema.
 
+Search API v1 additions (additive; existing fields, bounds and scopes are unchanged):
+
+- Added `GET /api/v1/tags`: tag names with meme counts for tags in use, under
+  the existing `search:read` scope and a 60 requests per token per minute limit.
+- Added optional `tag_match=any|all` to `GET /api/v1/search` (default `any`,
+  the previous behavior). `all` returns only memes that carry every selected
+  tag. Other values return `422 invalid_tag_match`, and `meta.tag_match` echoes
+  the applied value.
+
+This change does not alter the database schema.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

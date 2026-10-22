@@ -45,6 +45,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       { "requests" => 60, "window-seconds" => 60, "key" => "authenticated-token" },
       operation("/api/v1/folders").fetch("x-rate-limit")
     )
+    assert_equal "search:read", operation("/api/v1/tags").fetch("x-required-scope")
     assert_equal "media:read", operation("/api/v1/memes/{id}/content").fetch("x-required-scope")
     assert_equal Api::V1::SearchController::QUERY_MAX_LENGTH, parameters.dig("q", "schema", "maxLength")
     assert_equal Api::V1::SearchController::ALLOWED_MODES, parameters.dig("mode", "schema", "enum")
@@ -54,6 +55,8 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal Api::V1::SearchController::FOLDER_MAX_COUNT, parameters.dig("folder", "schema", "maxItems")
     assert_equal Api::V1::SearchController::FOLDER_MAX_LENGTH,
       parameters.dig("folder", "schema", "items", "maxLength")
+    assert_equal ImageSearchQuery::TAG_MATCH_MODES, parameters.dig("tag_match", "schema", "enum")
+    assert_equal "any", parameters.dig("tag_match", "schema", "default")
     assert_equal(
       ImageSearchQuery::MAX_RESULT_LIMIT,
       parameters.dig("limit", "schema", "maximum")
@@ -108,6 +111,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
   test "documents the exact status matrix and supported media types" do
     assert_equal %w[200 401 403 422 429], search_operation.fetch("responses").keys.sort
     assert_equal %w[200 401 403 429], operation("/api/v1/folders").fetch("responses").keys.sort
+    assert_equal %w[200 401 403 429], operation("/api/v1/tags").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404], operation("/api/v1/memes/{id}").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404],
       operation("/api/v1/memes/{id}/content").fetch("responses").keys.sort
@@ -146,6 +150,10 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     get api_v1_folders_url, headers: authorization_header
     assert_response :success
     assert_schema_instance("FolderListResponse", response.parsed_body)
+
+    get api_v1_tags_url, headers: authorization_header
+    assert_response :success
+    assert_schema_instance("TagListResponse", response.parsed_body)
 
     get api_v1_search_url, params: { q: "bunny" }
     assert_response :unauthorized
