@@ -163,13 +163,37 @@ class Settings::ImageToTextsControllerTest < ActionDispatch::IntegrationTest
     post save_openai_settings_settings_image_to_texts_path, params: {
       description_provider_setting: {
         openai_base_url: "https://api.openai.com/v1",
-        openai_model: "made-up-model",
+        openai_model: "m" * (DescriptionProviderSetting::OPENAI_MODEL_MAX_LENGTH + 1),
         openai_api_key: ""
       }
     }
 
     assert_redirected_to settings_image_to_texts_path(provider_tab: "openai")
-    assert_match "Openai model is not included in the list", flash[:alert]
+    assert_match "Openai model is too long", flash[:alert]
+  end
+
+  test "save_openai_settings accepts a custom model for openai-compatible backends" do
+    post save_openai_settings_settings_image_to_texts_path, params: {
+      description_provider_setting: {
+        openai_base_url: "http://ollama.test:11434/v1",
+        openai_model: "qwen3-vl:4b-instruct-q8_0",
+        openai_api_key: ""
+      }
+    }
+
+    assert_redirected_to settings_image_to_texts_path(provider_tab: "openai")
+    setting = DescriptionProviderSetting.current.reload
+    assert_equal "openai", setting.provider
+    assert_equal "qwen3-vl:4b-instruct-q8_0", setting.openai_model
+  end
+
+  test "index offers known cloud models as suggestions for a free text model field" do
+    get settings_image_to_texts_path(provider_tab: "openai")
+
+    assert_response :success
+    assert_select "input[type=text][name='description_provider_setting[openai_model]'][list=openai-model-suggestions]"
+    assert_select "datalist#openai-model-suggestions option", count: DescriptionProviderSetting.openai_model_options.size
+    assert_select "datalist#openai-model-suggestions option[value='gpt-4o-mini']"
   end
 
   test "save_openai_settings resets stale connection test status" do

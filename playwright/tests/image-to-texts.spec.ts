@@ -78,7 +78,7 @@ test.describe('Image-to-Texts Settings', () => {
     await expect(page.getByRole('button', { name: 'Test connection' })).toBeVisible();
     await expect(imageToTextsPage.clearSavedKeyButton).toBeVisible();
 
-    await expect(await imageToTextsPage.cloudModelOptions()).toEqual([
+    await expect(await imageToTextsPage.cloudModelSuggestions()).toEqual([
       'gpt-4o-mini',
       'gpt-4.1-mini',
       'gpt-4.1',
@@ -86,7 +86,7 @@ test.describe('Image-to-Texts Settings', () => {
 
     await imageToTextsPage.saveCloudSettings({
       baseUrl: 'http://openai.test/v1',
-      model: 'gpt-4.1-mini',
+      model: 'qwen3-vl:4b-instruct-q8_0',
       apiKey: fakeKey,
     });
 
@@ -95,7 +95,8 @@ test.describe('Image-to-Texts Settings', () => {
     await expect(page.getByText(fakeKey)).toHaveCount(0);
     await expect(page.getByText('Not tested')).toBeVisible();
     await expect(imageToTextsPage.baseUrlInput).toHaveValue('http://openai.test/v1');
-    await expect(imageToTextsPage.cloudModelSelect).toHaveValue('gpt-4.1-mini');
+    await expect(imageToTextsPage.cloudModelInput).toHaveValue('qwen3-vl:4b-instruct-q8_0');
+    await expect(page.locator('#runtime-provider')).toContainText('qwen3-vl:4b-instruct-q8_0');
     await expect(imageToTextsPage.apiKeyInput).toHaveValue('');
 
     await imageToTextsPage.clearSavedKey();
