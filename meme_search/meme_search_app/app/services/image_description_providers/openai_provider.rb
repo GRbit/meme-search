@@ -94,7 +94,9 @@ module ImageDescriptionProviders
       end
 
       save_description(image_core, attempt, description)
-      Result.new(success: true, message: "Generated description.", queued: false)
+      # No description text or key in the log: only what is needed to tell which backend answered.
+      Rails.logger.info "Image description generated for image #{image_core.id} provider=#{name} model=#{model}"
+      Result.new(success: true, message: "Generated description with #{model}.", queued: false)
     rescue Net::OpenTimeout, Net::ReadTimeout
       fail_image(image_core, attempt, "OpenAI vision API request timed out.")
     rescue StandardError => e

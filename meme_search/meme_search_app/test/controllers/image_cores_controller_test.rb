@@ -300,7 +300,7 @@ class ImageCoresControllerTest < ActionDispatch::IntegrationTest
     provider.define_singleton_method(:queued_provider?) { false }
     provider.define_singleton_method(:generate) { |_image_core| flunk "openai should be enqueued, not generated inline" }
 
-    with_env("IMAGE_DESCRIPTION_PROVIDER" => "openai") do
+    with_env("IMAGE_DESCRIPTION_PROVIDER" => "openai", "OPENAI_VISION_MODEL" => "gpt-4o-mini") do
       ImageDescriptionProviders::Factory.stub(:build, provider) do
         assert_difference("ImageDescriptionGenerationAttempt.count", 1) do
           assert_enqueued_jobs 1, only: GenerateImageDescriptionJob do
@@ -311,9 +311,23 @@ class ImageCoresControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to root_path
-    assert_equal "Queued description generation.", flash[:notice]
+    assert_equal "Queued description generation with gpt-4o-mini.", flash[:notice]
     assert_equal "in_queue", image_core.reload.status
     assert_equal "queued", image_core.active_description_generation_attempt.status
+  end
+
+  test "single image generate description names the openai model in the notice" do
+    image_core = image_cores(:one)
+    image_core.update!(description: nil, status: :not_started)
+
+    with_env("IMAGE_DESCRIPTION_PROVIDER" => "openai", "OPENAI_VISION_MODEL" => "qwen3-vl:4b-instruct-q8_0") do
+      assert_enqueued_jobs 1, only: GenerateImageDescriptionJob do
+        post generate_description_image_core_url(image_core)
+      end
+    end
+
+    assert_redirected_to root_path
+    assert_equal "Queued description generation with qwen3-vl:4b-instruct-q8_0.", flash[:notice]
   end
 
   test "bulk generate descriptions enqueues jobs for openai provider without calling api inline" do
