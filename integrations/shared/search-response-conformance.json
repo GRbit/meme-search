@@ -52,6 +52,21 @@
         },
         "future_top_level_field": true
       }
+    },
+    {
+      "name": "paging meta fields",
+      "payload": {
+        "data": [],
+        "meta": {
+          "query": "ship it",
+          "mode": "keyword",
+          "tags": [],
+          "limit": 5,
+          "offset": 5,
+          "next_offset": 10,
+          "count": 0
+        }
+      }
     }
   ],
   "invalid": [

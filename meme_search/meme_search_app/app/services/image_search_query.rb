@@ -3,6 +3,7 @@
 class ImageSearchQuery
   DEFAULT_RESULT_LIMIT = 10
   MAX_RESULT_LIMIT = 20
+  Page = Struct.new(:results, :more)
   STOPWORDS = %w[
     a i me my myself we our ours ourselves you your yours yourself yourselves
     he him his himself she her hers herself it its itself they them their theirs
@@ -17,37 +18,50 @@ class ImageSearchQuery
 
   # selected_path_names (exact ImagePath names) match any of their entries; when tags and
   # folders are both given a meme has to satisfy both.
-  def initialize(query:, mode:, selected_tag_names: [], selected_path_names: [], limit: DEFAULT_RESULT_LIMIT, tag_match: "any")
+  def initialize(query:, mode:, selected_tag_names: [], selected_path_names: [], limit: DEFAULT_RESULT_LIMIT, tag_match: "any", offset: 0)
     @query = query.to_s
     @mode = mode.to_s
     @selected_tag_names = Array(selected_tag_names).compact_blank
     @selected_path_names = Array(selected_path_names).compact_blank
     @tag_match = tag_match.to_s
     @limit = normalize_limit(limit)
+    @offset = [ offset.to_i, 0 ].max
   end
 
   def call
-    case mode
-    when "0", "keyword"
-      keyword_results
-    when "1", "vector"
-      vector_results
-    else
-      []
-    end
+    fetch(limit)
+  end
+
+  # Fetches one row past the limit so callers learn whether another page exists
+  # without a second count query (vector mode has no cheap total).
+  def page
+    rows = fetch(limit + 1)
+    Page.new(rows.first(limit), rows.length > limit)
   end
 
   private
 
-    attr_reader :query, :mode, :selected_tag_names, :selected_path_names, :limit, :tag_match
+    attr_reader :query, :mode, :selected_tag_names, :selected_path_names, :limit, :tag_match, :offset
 
-    def keyword_results
-      relation = ImageCore.search_any_word(remove_stopwords(query))
-      relation = relation.where(id: eligible_image_core_ids) if filtered?
-      relation.limit(limit).to_a
+    def fetch(count)
+      case mode
+      when "0", "keyword"
+        keyword_results(count)
+      when "1", "vector"
+        vector_results(count)
+      else
+        []
+      end
     end
 
-    def vector_results
+    def keyword_results(count)
+      relation = ImageCore.search_any_word(remove_stopwords(query))
+      relation = relation.where(id: eligible_image_core_ids) if filtered?
+      # pg_search appends the primary key to its rank order, so ties are stable across pages
+      relation.limit(count).offset(offset).to_a
+    end
+
+    def vector_results(count)
       image_core = ImageCore.first
       return [] unless image_core
 
@@ -57,7 +71,8 @@ class ImageSearchQuery
       # index exists. An approximate index (HNSW) would filter after its candidate
       # search and needs pgvector's iterative index scan to keep filtered results.
       ranked_ids = query_embedding.get_neighbor_image_core_ids(
-        limit: limit,
+        limit: count,
+        offset: offset,
         image_core_ids: filtered? ? eligible_image_core_ids : nil
       )
       image_cores_by_id = ImageCore.where(id: ranked_ids).index_by(&:id)

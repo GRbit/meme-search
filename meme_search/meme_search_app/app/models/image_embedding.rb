@@ -12,7 +12,7 @@ class ImageEmbedding < ApplicationRecord
     relation.first(limit)
   end
 
-  def get_neighbor_image_core_ids(limit: ImageSearchQuery::DEFAULT_RESULT_LIMIT, image_core_ids: nil)
+  def get_neighbor_image_core_ids(limit: ImageSearchQuery::DEFAULT_RESULT_LIMIT, image_core_ids: nil, offset: 0)
     ranked_embeddings = nearest_neighbors(:embedding, distance: "cosine")
     ranked_embeddings = ranked_embeddings.where(image_core_id: image_core_ids) if image_core_ids
 
@@ -24,6 +24,7 @@ class ImageEmbedding < ApplicationRecord
         Arel.sql("ranked_embeddings.image_core_id ASC")
       )
       .limit(limit)
+      .offset(offset)
       .pluck(Arel.sql("ranked_embeddings.image_core_id"))
   end
 
