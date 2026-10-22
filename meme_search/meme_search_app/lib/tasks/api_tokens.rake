@@ -1,10 +1,10 @@
 namespace :api_tokens do
-  desc "Create a read-only API token (EXPIRES_AT must be ISO 8601 with a timezone)"
+  desc "Create an API token, read-only unless SCOPES includes media:write (EXPIRES_AT must be ISO 8601 with a timezone)"
   task create: :environment do
     name = ENV.fetch("NAME", "").strip
     abort "NAME is required" if name.empty?
 
-    scopes = ENV.fetch("SCOPES", ApiToken::ALLOWED_SCOPES.join(",")).split(",").map(&:strip)
+    scopes = ENV.fetch("SCOPES", ApiToken::DEFAULT_SCOPES.join(",")).split(",").map(&:strip)
     expires_at = ApiToken.parse_expiry!(ENV["EXPIRES_AT"])
     token, raw_token = ApiToken.issue!(name: name, scopes: scopes, expires_at: expires_at)
 

@@ -30,7 +30,8 @@ or read its [timed transcript and exact commands](demos/search-api-v1-demo.md).
 ## Create and revoke tokens
 
 Open **Settings → API tokens** to create a named token, select one or both read
-scopes, and optionally set a future expiry. The raw value appears only in the
+scopes (and the opt-in `media:write` scope only for an upload client), and
+optionally set a future expiry. The raw value appears only in the
 immediate interactive response. Use **Copy token** or select it manually before
 navigating away: refresh and back navigation do not redisplay it, and Meme
 Search cannot recover it from the stored SHA-256 digest. The settings page also
@@ -79,7 +80,17 @@ interrupting the others. Available v1 scopes are:
 - `media:read` — stream the original media bytes
 
 There are no write, upload, tag-editing, settings, or administration scopes in
-v1.
+v1. API v2 adds one write scope:
+
+- `media:write` - upload images through `POST /api/v2/memes`
+
+`media:write` is never selected by default, in the settings form or in
+`api_tokens:create` without `SCOPES`, and existing tokens never gain it; create
+a separate token for the client that saves memes:
+
+```sh
+bin/rails api_tokens:create NAME="Telegram bot uploads" SCOPES="media:write"
+```
 
 ## Compatibility and read-only policy
 
@@ -240,6 +251,75 @@ The CLI and extension test suites both consume
 `integrations/shared/search-response-conformance.json`, including an
 additive-field fixture, so their required-field checks stay aligned.
 
+## Upload (API v2)
+
+API v2 is the write side and currently has one route. Reads stay in v1: the
+created memes are returned as v1 meme objects and fetched through v1.
+
+```sh
+curl http://127.0.0.1:3000/api/v2/memes \
+  --header "Authorization: Bearer $MEME_SEARCH_UPLOAD_TOKEN" \
+  --form "files[]=@ship-it.gif" \
+  --form "files[]=@incident.jpg" \
+  --form "folder=reactions" \
+  --form "generate_description=true"
+```
+
+- `files[]` is required: 1-10 files per request, each at most 10 MB and a
+  `.jpg`, `.jpeg`, `.png`, `.webp`, or `.gif` whose content is an image. These
+  are the web upload page's checks; both go through the same Rails service.
+- `folder` is optional: the exact name of an existing library folder (as
+  registered in **Settings → Paths**). It defaults to `direct-uploads`.
+  Folders are never created through the API.
+- `generate_description` is optional, `true` or `false` (default). `true`
+  queues description generation with the current provider for every created
+  meme; embeddings are computed when the description arrives.
+- A file whose bytes (SHA-256) already exist in the target folder, or earlier
+  in the same request, is not stored again and is reported under `duplicates`
+  with the existing meme (`null` when that file has not been indexed yet). The
+  same bytes in another folder are not a duplicate.
+- A name clash with different content gets a timestamp suffix, never an
+  overwrite. `meme.filename` is the stored name, `filename` the one you sent.
+- Uploads are limited to 30 requests per token per minute, counted separately
+  from searches.
+
+A well-formed request returns `200` with one entry per file:
+
+```json
+{
+  "data": {
+    "created": [
+      {
+        "filename": "ship-it.gif",
+        "description_queued": true,
+        "meme": {
+          "id": 43,
+          "filename": "ship-it.gif",
+          "description": null,
+          "tags": [],
+          "media_type": "image/gif",
+          "content_url": "/api/v1/memes/43/content"
+        }
+      }
+    ],
+    "duplicates": [{ "filename": "incident.jpg", "meme": { "id": 12, "...": "..." } }],
+    "errors": []
+  },
+  "meta": { "folder": "reactions", "generate_description": true }
+}
+```
+
+Per-file `errors` carry a `code` of `file_too_large`, `unsupported_file_type`,
+`invalid_image`, or `storage_failed` and a human-readable `message`; storage
+details stay in the server log. Request-level errors use the common envelope:
+`401`, `403` without `media:write`, `422` `invalid_files`, `invalid_folder`, or
+`invalid_generate_description` (nothing is stored), and `429`.
+
+Every file is logged at info level with the token's display prefix, folder,
+file name, size, and outcome; the token itself is never logged. The contract is
+in [`api-v2-openapi.yml`](api-v2-openapi.yml), validated by
+`npm run contract:openapi` with the v1 document.
+
 ## Included clients
 
 - [`integrations/cli`](../integrations/cli/README.md) provides dependency-free
@@ -368,8 +448,9 @@ cross-origin content URLs, and never follow authenticated redirects to another
 origin. A platform bot should upload returned bytes to the conversation rather
 than publish a local `/memes` URL.
 
-Community integrations must remain read-only, use a separate least-privilege
-token per client, honor result/rate bounds, and avoid direct database,
+Community integrations must remain read-only unless their purpose is saving
+memes, which goes through API v2 with its own `media:write` token. All must use a
+separate least-privilege token per client, honor result/rate bounds, and avoid direct database,
 filesystem, Python-service, or Docker-network access. Do not ask users to make
 the app public merely to connect a platform integration.
 

@@ -81,6 +81,21 @@ Search API v1 additions (additive; existing fields, bounds and scopes are unchan
 
 This change does not alter the database schema.
 
+Uploads through the API:
+
+- **API v2 uploads**: Added `POST /api/v2/memes` for multipart uploads of 1-10
+  images into an existing library folder (default `direct-uploads`), through
+  the same validation as the web upload page. Byte-identical files already in
+  the folder are reported as duplicates instead of stored twice, per-file
+  errors are reported next to the created memes, and `generate_description=true`
+  queues descriptions immediately.
+- Added the opt-in `media:write` token scope. It is never a default and
+  existing tokens do not gain it.
+- Uploads have their own per-token rate limit (30 requests per minute) and an
+  audit log line per file.
+
+API v1 is unchanged. No database migration.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

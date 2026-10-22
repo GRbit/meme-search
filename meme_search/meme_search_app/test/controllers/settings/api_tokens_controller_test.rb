@@ -22,7 +22,7 @@ module Settings
       assert_response :success
       assert_includes response.body, "API tokens"
       assert_includes response.body, "loopback-only"
-      assert_includes response.body, "protect only <code>/api/v1</code>"
+      assert_includes response.body, "protect only <code>/api/v1</code> and <code>/api/v2</code>"
       assert_includes response.body, "Search API setup and security guide"
       assert_includes response.body, ERB::Util.html_escape(active.name)
       assert_not_includes response.body, active.name
@@ -35,6 +35,26 @@ module Settings
       assert_not_includes response.body, raw_token
       assert_not_includes response.body, active.token_digest
       assert_equal "no-store", response.headers["Cache-Control"]
+    end
+
+    test "index offers media:write as an unchecked opt-in scope" do
+      get settings_api_tokens_url
+
+      assert_response :success
+      assert_select "input[type=checkbox][name='api_token[scopes][]'][value='search:read'][checked]"
+      assert_select "input[type=checkbox][name='api_token[scopes][]'][value='media:read'][checked]"
+      assert_select "input#api_token_scope_media_write[type=checkbox][name='api_token[scopes][]'][value='media:write']"
+      assert_select "input#api_token_scope_media_write[checked]", count: 0
+    end
+
+    test "create grants media:write only when it is selected" do
+      post settings_api_tokens_url,
+        params: { api_token: { name: "Uploader", scopes: [ "search:read", "media:write" ] } },
+        headers: turbo_stream_headers
+
+      assert_response :created
+      assert_equal %w[search:read media:write], ApiToken.find_by!(name: "Uploader").scopes
+      assert_select "input#api_token_scope_media_write[checked]", count: 0
     end
 
     test "create returns a raw token once without persisting or caching it" do

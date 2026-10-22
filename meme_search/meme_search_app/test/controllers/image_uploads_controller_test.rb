@@ -275,8 +275,193 @@ class ImageUploadsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/中文图片/, filename)
   end
 
-  # Note: Permission denied and disk full error handling is implemented in the controller
-  # with specific rescue clauses (Errno::EACCES and Errno::ENOSPC) but not tested here
-  # as mocking filesystem errors in integration tests is complex and unreliable.
-  # The error messages are verified by code inspection.
+  # The tests below pin the exact response bodies, status codes and side effects of the
+  # web upload so the upload logic can move out of the controller without changing them.
+
+  test "returns the exact success body with the scan result" do
+    ImagePath.ensure_direct_uploads_path!
+    file = create_test_image(filename: "exact.jpg")
+    size = file.size
+
+    post image_uploads_url, params: { files: [ file ] }
+
+    assert_response :ok
+    assert_equal "application/json; charset=utf-8", response.content_type
+    expected = {
+      "success" => [
+        { "success" => true, "filename" => "exact.jpg", "size" => size, "path" => "/memes/direct-uploads/exact.jpg" }
+      ],
+      "errors" => [],
+      "scan" => { "added" => 1, "removed" => 0, "unsafe" => 0 }
+    }
+    assert_equal expected.to_json, response.body
+  end
+
+  test "returns the exact no-files body without creating the direct-uploads path" do
+    ImagePath.find_by(name: "direct-uploads")&.destroy
+
+    assert_no_difference("ImagePath.count") do
+      post image_uploads_url, params: {}
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal({ error: "No files selected" }.to_json, response.body)
+  end
+
+  test "creates the direct-uploads path and skips the scan when every file is rejected" do
+    ImagePath.find_by(name: "direct-uploads")&.destroy
+    invalid_file = Rack::Test::UploadedFile.new(StringIO.new("pdf"), "application/pdf", original_filename: "doc.pdf")
+
+    assert_difference("ImagePath.count", 1) do
+      post image_uploads_url, params: { files: [ invalid_file ] }
+    end
+
+    assert_response :unprocessable_entity
+    expected = {
+      "success" => [],
+      "errors" => [
+        { "success" => false, "filename" => "doc.pdf", "error" => "Invalid file type. Allowed: .jpg, .jpeg, .png, .webp, .gif" }
+      ]
+    }
+    assert_equal expected.to_json, response.body
+    assert_nil ImagePath.find_by!(name: "direct-uploads").last_scanned_at
+  end
+
+  test "returns both lists and the scan when files are mixed" do
+    ImagePath.ensure_direct_uploads_path!
+    valid_file = create_test_image(filename: "mixed_ok.jpg")
+    size = valid_file.size
+    fake_image = Rack::Test::UploadedFile.new(StringIO.new("not an image"), "image/jpeg", original_filename: "mixed_bad.jpg")
+
+    post image_uploads_url, params: { files: [ valid_file, fake_image ] }
+
+    assert_response :unprocessable_entity
+    expected = {
+      "success" => [
+        { "success" => true, "filename" => "mixed_ok.jpg", "size" => size, "path" => "/memes/direct-uploads/mixed_ok.jpg" }
+      ],
+      "errors" => [
+        { "success" => false, "filename" => "mixed_bad.jpg", "error" => "Invalid image file. File content does not match image format." }
+      ],
+      "scan" => { "added" => 1, "removed" => 0, "unsafe" => 0 }
+    }
+    assert_equal expected.to_json, response.body
+  end
+
+  test "returns a null scan when the direct-uploads path is already scanning" do
+    ImagePath.ensure_direct_uploads_path!.update_columns(currently_scanning: true)
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "while_scanning.jpg") ] }
+
+    assert_response :ok
+    json_response = JSON.parse(response.body)
+    assert json_response.key?("scan")
+    assert_nil json_response["scan"]
+    assert File.exist?(File.join(@upload_dir, "while_scanning.jpg"))
+  ensure
+    ImagePath.find_by(name: "direct-uploads")&.update_columns(currently_scanning: false)
+  end
+
+  test "accepts a file of exactly 10MB and rejects one byte more" do
+    ImagePath.ensure_direct_uploads_path!
+    jpeg = create_test_image.read
+    limit = 10.megabytes
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "at_limit.jpg", content: jpeg + ("x" * (limit - jpeg.bytesize))) ] }
+    assert_response :ok
+    assert_equal limit, File.size(File.join(@upload_dir, "at_limit.jpg"))
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "over_limit.jpg", content: jpeg + ("x" * (limit + 1 - jpeg.bytesize))) ] }
+    assert_response :unprocessable_entity
+    assert_equal(
+      { "success" => false, "filename" => "over_limit.jpg", "error" => "File size exceeds maximum allowed (10MB)" },
+      JSON.parse(response.body).fetch("errors").first
+    )
+  end
+
+  test "accepts an upper-case extension and keeps the name as given" do
+    ImagePath.ensure_direct_uploads_path!
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "Shout.JPG") ] }
+
+    assert_response :ok
+    assert_equal "Shout.JPG", JSON.parse(response.body).fetch("success").first.fetch("filename")
+    assert File.exist?(File.join(@upload_dir, "Shout.JPG"))
+  end
+
+  test "collapses whitespace in file names" do
+    ImagePath.ensure_direct_uploads_path!
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "  my    spaced   meme.jpg") ] }
+
+    assert_response :ok
+    entry = JSON.parse(response.body).fetch("success").first
+    assert_equal "my spaced meme.jpg", entry.fetch("filename")
+    assert_equal "/memes/direct-uploads/my spaced meme.jpg", entry.fetch("path")
+  end
+
+  test "checks the extension before sanitizing, so a trailing space is rejected" do
+    ImagePath.ensure_direct_uploads_path!
+
+    post image_uploads_url, params: { files: [ create_test_image(filename: "trailing.jpg ") ] }
+
+    assert_response :unprocessable_entity
+    assert_equal "trailing.jpg ", JSON.parse(response.body).fetch("errors").first.fetch("filename")
+  end
+
+  test "names a duplicate with the current unix timestamp" do
+    ImagePath.ensure_direct_uploads_path!
+    File.binwrite(File.join(@upload_dir, "dup_time.jpg"), "existing")
+
+    travel_to Time.zone.at(1_700_000_000) do
+      post image_uploads_url, params: { files: [ create_test_image(filename: "dup_time.jpg") ] }
+    end
+
+    assert_response :ok
+    entry = JSON.parse(response.body).fetch("success").first
+    assert_equal "dup_time_1700000000.jpg", entry.fetch("filename")
+    assert_equal "/memes/direct-uploads/dup_time_1700000000.jpg", entry.fetch("path")
+    assert_equal "existing", File.binread(File.join(@upload_dir, "dup_time.jpg"))
+  end
+
+  test "reports a MIME detection failure with its message" do
+    ImagePath.ensure_direct_uploads_path!
+
+    Marcel::MimeType.stub(:for, ->(*) { raise "detector broke" }) do
+      post image_uploads_url, params: { files: [ create_test_image(filename: "detect.jpg") ] }
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal(
+      { "success" => false, "filename" => "detect.jpg", "error" => "Failed to validate file type: detector broke" },
+      JSON.parse(response.body).fetch("errors").first
+    )
+  end
+
+  {
+    Errno::ENOSPC => "Server disk is full. Please free up space or contact administrator.",
+    Errno::EACCES => "Cannot write to uploads directory. Check Docker volume mount permissions in docker-compose.yml",
+    IOError => "Failed to save file: write broke"
+  }.each do |error_class, message|
+    test "reports #{error_class} while writing the upload" do
+      ImagePath.ensure_direct_uploads_path!
+      original_open = File.method(:open)
+      failing_open = lambda do |path, *args, **kwargs, &block|
+        raise error_class, "write broke" if path.to_s.include?("direct-uploads")
+
+        original_open.call(path, *args, **kwargs, &block)
+      end
+
+      File.stub(:open, failing_open) do
+        post image_uploads_url, params: { files: [ create_test_image(filename: "write_fail.jpg") ] }
+      end
+
+      assert_response :unprocessable_entity
+      assert_equal(
+        { "success" => false, "filename" => "write_fail.jpg", "error" => message },
+        JSON.parse(response.body).fetch("errors").first
+      )
+      assert_not File.exist?(File.join(@upload_dir, "write_fail.jpg"))
+    end
+  end
 end
