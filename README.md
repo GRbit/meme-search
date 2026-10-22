@@ -265,6 +265,14 @@ OPENAI_API_KEY=your_api_key
 OPENAI_VISION_MODEL=gpt-4o-mini
 ```
 
+`OPENAI_API_BASE_URL` can point at any OpenAI-compatible server. For example, with Ollama use `OPENAI_API_BASE_URL=http://<ollama-host>:11434/v1` and a vision model name such as `OPENAI_VISION_MODEL=qwen3-vl:4b-instruct-q8_0`. Ollama ignores the key, but `OPENAI_API_KEY` must still be set to any placeholder value. The model can also be typed into Settings -> AI Models -> OpenAI-compatible API; environment variables override the saved values.
+
+Settings -> AI Models shows the runtime provider, model and base URL that generation actually uses, and which environment variable (if any) set them. After you click generate, the notice names the model. Each successful OpenAI-compatible description is logged by the Solid Queue worker, so you can confirm the model with:
+
+```sh
+docker compose logs meme_search_jobs | grep "provider=openai"
+```
+
 Then start Rails, the Solid Queue worker, and the database without the Python generator:
 
 ```sh

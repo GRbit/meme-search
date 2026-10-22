@@ -35,7 +35,7 @@ The new UX must preserve environment-variable support and should not replace the
   - `OpenAI-compatible API`
 - The Local tab keeps the existing local model card selection pattern.
 - There is no redundant local-model dropdown.
-- The Cloud tab uses a fixed OpenAI model dropdown for now.
+- The Cloud tab uses a free-text model field with OpenAI model names as suggestions, so OpenAI-compatible backends such as Ollama can use their own model names. (It started as a fixed dropdown.)
 - The saved API key is application-wide.
 - `OPENAI_API_KEY` environment variable takes precedence over the saved UI key.
 - Existing OpenAI-related environment variables remain supported as deployment overrides.
@@ -75,7 +75,7 @@ This tab configures the external provider.
 It shows:
 
 - Base URL input, default `https://api.openai.com/v1`.
-- Fixed model dropdown:
+- Model text field (up to 200 characters) with suggestions:
   - `gpt-4o-mini`
   - `gpt-4.1-mini`
   - `gpt-4.1`
@@ -96,6 +96,8 @@ It shows:
   - `Failed`
   - `Not tested`
 - Environment override status when `IMAGE_DESCRIPTION_PROVIDER`, `OPENAI_API_BASE_URL`, or `OPENAI_VISION_MODEL` is setting runtime behavior.
+
+Above both tabs, a runtime panel shows the provider, model and (for OpenAI-compatible) base URL that generation actually uses, with their source (environment variable or saved setting). The page opens on the tab of that runtime provider unless a tab is requested explicitly.
 
 Actions:
 
@@ -181,7 +183,7 @@ Controller and system-level tests should cover:
 - Models page renders local tab by default.
 - Local provider selection persists.
 - Local model selection still persists through existing `ImageToText` behavior.
-- Cloud settings save base URL and fixed model.
+- Cloud settings save base URL and model.
 - Cloud settings save and redact API key.
 - Clear saved key removes key metadata.
 - Env key precedence over saved key.

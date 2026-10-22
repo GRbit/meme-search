@@ -3,15 +3,19 @@
 class DescriptionProviderSetting < ApplicationRecord
   SINGLETON_KEY = 0
   PROVIDERS = %w[local openai].freeze
+  # Suggestions only: OpenAI-compatible backends (Ollama, vLLM, ...) use their own model names.
   OPENAI_MODELS = %w[gpt-4o-mini gpt-4.1-mini gpt-4.1].freeze
+  OPENAI_MODEL_MAX_LENGTH = 200
   DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
   DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
   validates :singleton_key, presence: true, uniqueness: true, inclusion: { in: [ SINGLETON_KEY ] }
   validates :provider, inclusion: { in: PROVIDERS }
   validates :openai_base_url, presence: true
-  validates :openai_model, inclusion: { in: OPENAI_MODELS }
+  validates :openai_model, presence: true, length: { maximum: OPENAI_MODEL_MAX_LENGTH }
   validates :openai_last_test_status, inclusion: { in: %w[not_tested passed failed] }
+
+  normalizes :openai_model, with: ->(model) { model.strip }
 
   before_validation :apply_defaults
 

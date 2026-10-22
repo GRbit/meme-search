@@ -9,7 +9,7 @@ export class ImageToTextsPage {
   readonly saveCloudButton: Locator;
   readonly clearSavedKeyButton: Locator;
   readonly baseUrlInput: Locator;
-  readonly cloudModelSelect: Locator;
+  readonly cloudModelInput: Locator;
   readonly apiKeyInput: Locator;
 
   constructor(page: Page) {
@@ -21,7 +21,7 @@ export class ImageToTextsPage {
     this.saveCloudButton = page.getByRole('button', { name: 'Save Cloud Selection' });
     this.clearSavedKeyButton = page.getByRole('button', { name: 'Clear saved key' });
     this.baseUrlInput = page.getByLabel('Base URL');
-    this.cloudModelSelect = page.getByLabel('Cloud model');
+    this.cloudModelInput = page.getByLabel('Cloud model');
     this.apiKeyInput = page.getByLabel('API key');
   }
 
@@ -80,7 +80,7 @@ export class ImageToTextsPage {
 
   async saveCloudSettings(options: { baseUrl: string; model: string; apiKey?: string }): Promise<void> {
     await this.baseUrlInput.fill(options.baseUrl);
-    await this.cloudModelSelect.selectOption(options.model);
+    await this.cloudModelInput.fill(options.model);
 
     if (options.apiKey !== undefined) {
       await this.apiKeyInput.fill(options.apiKey);
@@ -101,8 +101,9 @@ export class ImageToTextsPage {
     await this.page.waitForLoadState('networkidle');
   }
 
-  async cloudModelOptions(): Promise<string[]> {
-    return await this.cloudModelSelect.locator('option').evaluateAll((options) =>
+  async cloudModelSuggestions(): Promise<string[]> {
+    const listId = await this.cloudModelInput.getAttribute('list');
+    return await this.page.locator(`datalist#${listId} option`).evaluateAll((options) =>
       options.map((option) => (option as HTMLOptionElement).value),
     );
   }

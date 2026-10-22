@@ -73,7 +73,7 @@ class ImageCoresController < ApplicationController
           )
           @image_core.update!(status: :in_queue)
           GenerateImageDescriptionJob.perform_later(@image_core.id, configuration.job_options, attempt.id)
-          ImageDescriptionProviders::Result.new(success: true, message: "Queued description generation.", queued: true)
+          ImageDescriptionProviders::Result.new(success: true, message: queued_generation_message(configuration), queued: true)
         end
 
       respond_to do |format|
@@ -376,6 +376,13 @@ class ImageCoresController < ApplicationController
 
     def queued_provider_for_cancel?(image_core)
       image_description_provider.queued_provider?
+    end
+
+    # Name the model so env overrides (e.g. an Ollama model) are visible where generation starts.
+    def queued_generation_message(configuration)
+      return "Queued description generation." unless configuration.provider == "openai"
+
+      "Queued description generation with #{configuration.openai_model}."
     end
 
     def provider_name(provider, configuration)

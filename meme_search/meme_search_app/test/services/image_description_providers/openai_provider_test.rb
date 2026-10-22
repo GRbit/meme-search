@@ -47,13 +47,21 @@ class ImageDescriptionProviders::OpenaiProviderTest < ActiveSupport::TestCase
           headers: { "Content-Type" => "application/json" }
         )
 
+      logged = []
       @image_core.stub(:refresh_description_embeddings, true) do
         ActionCable.server.stub(:broadcast, true) do
-          result = ImageDescriptionProviders::OpenaiProvider.new.generate(@image_core, attempt: attempt)
+          Rails.logger.stub(:info, ->(message = nil) { logged << message }) do
+            result = ImageDescriptionProviders::OpenaiProvider.new.generate(@image_core, attempt: attempt)
 
-          assert result.success?
+            assert result.success?
+            assert_equal "Generated description with vision-test.", result.message
+          end
         end
       end
+
+      success_log = logged.grep(/provider=openai model=vision-test/)
+      assert_equal 1, success_log.size, "expected one success log line, got #{logged.inspect}"
+      assert_no_match(/fresh active attempt|test-key/, success_log.first)
     end
 
     assert_equal description, @image_core.reload.description

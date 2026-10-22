@@ -41,12 +41,38 @@ class DescriptionProviderSettingTest < ActiveSupport::TestCase
     assert_includes setting.errors[:provider], "is not included in the list"
   end
 
-  test "openai model only allows fixed model list" do
+  test "openai model accepts names from openai-compatible backends" do
     setting = DescriptionProviderSetting.current
-    setting.openai_model = "made-up-model"
+    setting.openai_model = "qwen3-vl:4b-instruct-q8_0"
+
+    assert setting.valid?
+    setting.save!
+    assert_equal "qwen3-vl:4b-instruct-q8_0", setting.reload.openai_model
+  end
+
+  test "openai model keeps previously listed names valid" do
+    setting = DescriptionProviderSetting.current
+
+    DescriptionProviderSetting.openai_model_options.each do |model|
+      setting.openai_model = model
+      assert setting.valid?, "#{model} should stay valid"
+    end
+  end
+
+  test "openai model strips surrounding whitespace" do
+    setting = DescriptionProviderSetting.current
+    setting.openai_model = "  llava:7b  "
+
+    assert setting.valid?
+    assert_equal "llava:7b", setting.openai_model
+  end
+
+  test "openai model rejects overly long names" do
+    setting = DescriptionProviderSetting.current
+    setting.openai_model = "m" * (DescriptionProviderSetting::OPENAI_MODEL_MAX_LENGTH + 1)
 
     assert_not setting.valid?
-    assert_includes setting.errors[:openai_model], "is not included in the list"
+    assert_includes setting.errors[:openai_model], "is too long (maximum is #{DescriptionProviderSetting::OPENAI_MODEL_MAX_LENGTH} characters)"
   end
 
   test "api key is encrypted, redacted, and recoverable" do

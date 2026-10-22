@@ -10,6 +10,43 @@
 
   <% content_for :title, "Image to text models" %>
 
+  <% runtime_openai = @provider_configuration.provider == "openai" %>
+  <% runtime_label_classes = "text-xs uppercase tracking-wide font-bold text-gray-500 dark:text-gray-400" %>
+  <% runtime_value_classes = "font-bold text-gray-800 dark:text-white mt-1 break-all" %>
+  <% runtime_source_classes = "text-sm text-gray-600 dark:text-gray-400 mt-1" %>
+  <div id="runtime-provider" class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-slate-900/60 border border-gray-200 dark:border-gray-700">
+    <div data-runtime="provider">
+      <div class="<%= runtime_label_classes %>">Runtime provider</div>
+      <div class="<%= runtime_value_classes %>"><%= runtime_openai ? "OpenAI-compatible API" : "Local generator" %></div>
+      <div class="<%= runtime_source_classes %>">
+        <% if @provider_configuration.provider_env_override? %>
+          From IMAGE_DESCRIPTION_PROVIDER. Saving a tab below does not change it until the variable is removed.
+        <% else %>
+          Saved setting
+        <% end %>
+      </div>
+    </div>
+
+    <div data-runtime="model">
+      <div class="<%= runtime_label_classes %>">Runtime model</div>
+      <% if runtime_openai %>
+        <div class="<%= runtime_value_classes %>"><%= @provider_configuration.openai_model %></div>
+        <div class="<%= runtime_source_classes %>"><%= @provider_configuration.openai_model_env_override? ? "From OPENAI_VISION_MODEL" : "Saved setting" %></div>
+      <% else %>
+        <div class="<%= runtime_value_classes %>"><%= @current_local_model&.name || "None selected" %></div>
+        <div class="<%= runtime_source_classes %>">Local model selection</div>
+      <% end %>
+    </div>
+
+    <% if runtime_openai %>
+      <div data-runtime="base-url">
+        <div class="<%= runtime_label_classes %>">Runtime base URL</div>
+        <div class="<%= runtime_value_classes %>"><%= @provider_configuration.openai_base_url %></div>
+        <div class="<%= runtime_source_classes %>"><%= @provider_configuration.openai_base_url_env_override? ? "From OPENAI_API_BASE_URL" : "Saved setting" %></div>
+      </div>
+    <% end %>
+  </div>
+
   <% active_tab = @provider_tab == "openai" ? "openai" : "local" %>
   <% provider_tab_panel_classes = "p-5 transition-all" %>
   <% provider_tab_button_classes = "text-lg font-bold text-gray-800 dark:text-white text-left" %>
@@ -116,7 +153,7 @@
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h2 class="text-2xl font-bold text-gray-800 dark:text-white">OpenAI-compatible provider</h2>
-            <p class="text-gray-600 dark:text-gray-400 mt-1">Choose a fixed cloud model and configure the key source.</p>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">Choose a vision model and configure the key source.</p>
           </div>
 
           <% if @provider_configuration.openai_env_key? %>
@@ -134,15 +171,21 @@
               <%= form.label :openai_base_url, "Base URL", class: "block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" %>
               <%= form.text_field :openai_base_url, class: "w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white/90 dark:bg-slate-700/90 px-4 py-3 text-gray-900 dark:text-white" %>
               <% if @provider_configuration.openai_base_url_env_override? %>
-                <p class="text-sm text-amber-700 dark:text-amber-300 mt-2">OPENAI_API_BASE_URL is overriding this saved value at runtime.</p>
+                <p class="text-sm text-amber-700 dark:text-amber-300 mt-2">OPENAI_API_BASE_URL (<%= @provider_configuration.openai_base_url %>) is overriding this saved value at runtime.</p>
               <% end %>
             </div>
 
             <div>
               <%= form.label :openai_model, "Cloud model", class: "block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" %>
-              <%= form.select :openai_model, DescriptionProviderSetting.openai_model_options, {}, class: "w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white/90 dark:bg-slate-700/90 px-4 py-3 text-gray-900 dark:text-white" %>
+              <%= form.text_field :openai_model, list: "openai-model-suggestions", maxlength: DescriptionProviderSetting::OPENAI_MODEL_MAX_LENGTH, autocomplete: "off", class: "w-full rounded-xl border border-gray-300 dark:border-gray-600 bg-white/90 dark:bg-slate-700/90 px-4 py-3 text-gray-900 dark:text-white" %>
+              <datalist id="openai-model-suggestions">
+                <% DescriptionProviderSetting.openai_model_options.each do |model| %>
+                  <option value="<%= model %>"></option>
+                <% end %>
+              </datalist>
+              <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">Any model name your OpenAI-compatible server accepts, for example an Ollama vision model.</p>
               <% if @provider_configuration.openai_model_env_override? %>
-                <p class="text-sm text-amber-700 dark:text-amber-300 mt-2">OPENAI_VISION_MODEL is overriding this saved value at runtime.</p>
+                <p class="text-sm text-amber-700 dark:text-amber-300 mt-2">OPENAI_VISION_MODEL (<%= @provider_configuration.openai_model %>) is overriding this saved value at runtime.</p>
               <% end %>
             </div>
           </div>
