@@ -43,6 +43,18 @@
       </p>
     </div>
 
+    <!-- Include Subfolders Field -->
+    <div class="w-full">
+      <label class="inline-flex items-center space-x-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+        <%= form.check_box :include_subfolders,
+          class: "w-5 h-5 rounded border-indigo-300 dark:border-indigo-600 text-indigo-600 focus:ring-indigo-500 dark:bg-slate-700" %>
+        <span>Include subfolders</span>
+      </label>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+        Register every direct subfolder as its own directory path when this folder is scanned. One level only; hidden and symlinked folders are skipped. New subfolders get this folder's scan frequency.
+      </p>
+    </div>
+
     <!-- Submit Button -->
     <div class="flex justify-center pt-4">
       <%= form.submit "Save Path", class: submit_button_classes + " w-full sm:w-auto" %>

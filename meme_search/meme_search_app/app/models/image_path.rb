@@ -25,6 +25,7 @@ class ImagePath < ApplicationRecord
 
   validate :valid_dir
   after_save :list_files_in_directory
+  after_save :register_subfolders
 
   # Ensure the direct-uploads ImagePath exists
   def self.ensure_direct_uploads_path!
@@ -87,7 +88,7 @@ class ImagePath < ApplicationRecord
   def scan_and_update!
     return if currently_scanning?
 
-    with_lock do
+    result = with_lock do
       update_columns(currently_scanning: true, scan_status: :scanning, last_scan_error: nil)
       start_time = Time.current
 
@@ -118,6 +119,10 @@ class ImagePath < ApplicationRecord
         raise
       end
     end
+
+    # Outside the lock: children are scanned one by one and must not hold the parent row meanwhile.
+    register_subfolders
+    result
   end
 
   private
@@ -132,6 +137,47 @@ class ImagePath < ApplicationRecord
     end
 
     def count_images
+    end
+
+    # Integrations that write one folder per user (telegram/<user>) need new folders searchable without a
+    # Settings round trip. One level only: children never get the flag, so this does not recurse.
+    def register_subfolders
+      return unless include_subfolders?
+
+      full_path = directory_path
+      return unless full_path&.directory?
+
+      base_name = Pathname.new(name).cleanpath.to_s
+      Dir.children(full_path).sort.each do |entry|
+        # Same rules as the file scan: hidden entries and symlinks are never followed.
+        next if entry.start_with?(".")
+
+        entry_path = full_path.join(entry)
+        next if entry_path.symlink? || !entry_path.directory?
+
+        child_name = "#{base_name}/#{entry}"
+        # Existing children keep their own settings and schedule.
+        next if ImagePath.exists?(name: child_name)
+
+        register_subfolder(child_name)
+      end
+    rescue SystemCallError => e
+      Rails.logger.warn "[Scan] #{name} - Could not list subfolders: #{e.message}"
+    end
+
+    def register_subfolder(child_name)
+      # A savepoint keeps a lost uniqueness race from aborting the caller's transaction.
+      child = ImagePath.transaction(requires_new: true) do
+        ImagePath.create!(name: child_name, scan_frequency_minutes: scan_frequency_minutes)
+      end
+      Rails.logger.info "[Scan] #{name} - Registered subfolder #{child_name}"
+      # Scan now so the child is searchable in this pass and is not immediately due for the auto-scan job.
+      child.scan_and_update!
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
+      Rails.logger.warn "[Scan] #{name} - Could not register subfolder #{child_name}: #{e.message}"
+    rescue => e
+      # The child records its own failed status; keep registering its siblings.
+      Rails.logger.error "[Scan] #{name} - Scan of new subfolder #{child_name} failed: #{e.message}"
     end
 
   def list_files_in_directory

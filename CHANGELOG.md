@@ -31,6 +31,23 @@ Local description generation:
 This change does not touch the database schema, the job queue, or the Search
 API contract.
 
+Web UI fix:
+
+- Images in nested library folders (for example an image path named
+  `telegram/grbit`) now load in the web UI. Image URLs were built from the last
+  path segment only and returned 404. The URL now keeps every segment, escapes
+  each one (spaces, `#`, `?`, `%`, non-ASCII), and no longer contains a double
+  slash after the host.
+
+Image paths:
+
+- New "Include subfolders" option on a directory path. When the path is saved
+  or scanned, every direct subfolder (one level, hidden and symlinked folders
+  skipped) is registered as its own path named `<parent>/<child>`, inherits the
+  parent's scan frequency and is scanned in the same pass. Existing child paths
+  are left alone, and a vanished subfolder's path is not deleted. Off by
+  default; adds the `image_paths.include_subfolders` column (run migrations).
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:

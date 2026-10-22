@@ -480,6 +480,31 @@ module Settings
       assert_equal 60, @image_path.scan_frequency_minutes
     end
 
+    test "create and update accept include_subfolders" do
+      root_name = "subfolders-controller-test-#{SecureRandom.hex(6)}"
+      root = Rails.root.join("public", "memes", root_name)
+      FileUtils.mkdir_p(root.join("alice"))
+
+      post settings_image_paths_url, params: {
+        image_path: { name: root_name, scan_frequency_minutes: 30, include_subfolders: "1" }
+      }
+
+      parent = ImagePath.find_by!(name: root_name)
+      assert_redirected_to settings_image_path_url(parent)
+      assert parent.include_subfolders?
+      assert ImagePath.exists?(name: "#{root_name}/alice", scan_frequency_minutes: 30)
+
+      patch settings_image_path_url(parent), params: { image_path: { name: root_name, include_subfolders: "0" } }
+      assert_not parent.reload.include_subfolders?
+    ensure
+      FileUtils.rm_rf(root) if root
+    end
+
+    test "form shows the include_subfolders toggle" do
+      get new_settings_image_path_url
+      assert_select "input[type=checkbox][name='image_path[include_subfolders]']"
+    end
+
     test "rescan action uses scan_and_update! for tracking" do
       image_path = ImagePath.create!(name: "test_valid_directory", scan_frequency_minutes: 30)
 
