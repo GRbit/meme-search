@@ -180,23 +180,25 @@ class ImageCore < ApplicationRecord
   end
 
   def refresh_description_embeddings
-    # destroy current description embeddings
-    begin
-      current_embeddings = ImageEmbedding.where({ image_core_id: self.id })
-      current_embeddings.map { |item| item.destroy! }
-      current_embeddings = ImageEmbedding.where({ image_core_id: self.id })
-    rescue StandardError => e
-      puts "THE DESTROY EXCEPTION --> #{e}"
+    snippets = description.to_s.empty? ? [] : chunk_text(description)
+    # Inference is slow, so run it before the transaction to keep the swap short.
+    new_embeddings = snippets.map do |snippet|
+      ImageEmbedding.new(image_core_id: id, snippet: snippet).tap(&:compute_embedding)
     end
-    if !self.description.nil?
-      if self.description.length > 0
-        snippets = chunk_text(self.description)
-        snippets_hash = snippets.map.with_index { |snippet, index| { image_core_id: self.id, snippet: snippet } }
-        snippets_hash.map { |hash| ImageEmbedding.new(hash).save! }
-      end
+
+    had_embeddings = ImageEmbedding.exists?(image_core_id: id)
+    # One transaction so search sees either the full old set or the full new set, never a gap.
+    ImageEmbedding.transaction do
+      ImageEmbedding.where(image_core_id: id).delete_all
+      new_embeddings.each(&:save!)
     end
-    # New embeddings can turn the API description_status ready, so the change feed must see them.
-    touch if persisted?
+
+    # Touch only when the API description_status can flip: a plain recompute (e.g. a rebuild of
+    # every meme) must not reorder the gallery or flood the change feed with unchanged memes.
+    touch if persisted? && had_embeddings != new_embeddings.any?
+  rescue StandardError => e
+    Rails.logger.error("Failed to refresh embeddings for image core #{id}: #{e.class}: #{e.message}")
+    raise
   end
 
   private
