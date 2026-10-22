@@ -229,7 +229,7 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
   test "tag_match all works in vector mode" do
     query_embedding = Object.new
     query_embedding.define_singleton_method(:compute_embedding) { Array.new(384, 0.5) }
-    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:|
+    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:, offset: 0|
       image_core_ids.to_a.map(&:id)
     end
 

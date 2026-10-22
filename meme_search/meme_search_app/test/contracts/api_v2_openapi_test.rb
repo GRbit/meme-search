@@ -56,7 +56,7 @@ class ApiV2OpenapiTest < ActionDispatch::IntegrationTest
     assert_documented_keys "DuplicateFile", body.dig("data", "duplicates", 0)
     assert_documented_keys "FailedFile", body.dig("data", "errors", 0)
     assert_documented_keys "Meme", body.dig("data", "created", 0, "meme")
-    assert_equal Api::V1::MemeSerializer.new(image_cores(:one), content_url: "x").as_json.keys.map(&:to_s).sort,
+    assert_equal Api::V1::MemeSerializer.new(image_cores(:one), content_url: "x", embedded: false).as_json.keys.map(&:to_s).sort,
       schema("Meme").fetch("required").sort
   end
 

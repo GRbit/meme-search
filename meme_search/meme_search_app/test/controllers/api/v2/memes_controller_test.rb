@@ -74,7 +74,9 @@ class Api::V2::MemesControllerTest < ActionDispatch::IntegrationTest
                 "description" => nil,
                 "tags" => [],
                 "media_type" => "image/jpeg",
-                "content_url" => "/api/v1/memes/#{image_core.id}/content"
+                "content_url" => "/api/v1/memes/#{image_core.id}/content",
+                "folder" => "direct-uploads",
+                "description_status" => "pending"
               }
             }
           ],

@@ -70,7 +70,7 @@ class ImageSearchQueryTest < ActiveSupport::TestCase
     query_embedding = Object.new
     captured = {}
     query_embedding.define_singleton_method(:compute_embedding) { Array.new(384, 0.5) }
-    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:|
+    query_embedding.define_singleton_method(:get_neighbor_image_core_ids) do |limit:, image_core_ids:, offset: 0|
       captured[:eligible_ids] = image_core_ids.to_a.map(&:id)
       []
     end
