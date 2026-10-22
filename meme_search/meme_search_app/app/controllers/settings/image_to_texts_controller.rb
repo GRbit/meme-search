@@ -6,7 +6,9 @@ module Settings
       @image_to_texts = ImageToText.order(id: :asc)
       @provider_setting = DescriptionProviderSetting.current
       @provider_configuration = ImageDescriptionProviders::Configuration.current
-      @provider_tab = params[:provider_tab].presence || @provider_setting.provider
+      # The runtime provider, not the saved one: env overrides would otherwise open the inactive tab.
+      @provider_tab = params[:provider_tab].presence || @provider_configuration.provider
+      @current_local_model = @image_to_texts.find(&:current)
     end
 
     def update_current

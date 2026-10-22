@@ -13,6 +13,84 @@ class Settings::ImageToTextsControllerTest < ActionDispatch::IntegrationTest
     assert_select "#image_to_texts"
   end
 
+  test "index opens the tab of the provider set by the environment" do
+    with_openai_env_cleared do
+      with_env("IMAGE_DESCRIPTION_PROVIDER" => "openai") do
+        get settings_image_to_texts_path
+      end
+    end
+
+    assert_response :success
+    assert_select "h2", "OpenAI-compatible provider"
+    assert_select "#image_to_texts", count: 0
+  end
+
+  test "index keeps an explicit provider tab over the runtime provider" do
+    with_openai_env_cleared do
+      with_env("IMAGE_DESCRIPTION_PROVIDER" => "openai") do
+        get settings_image_to_texts_path(provider_tab: "local")
+      end
+    end
+
+    assert_response :success
+    assert_select "h2", "Local model"
+  end
+
+  test "index shows runtime openai model and base url from the environment without the key" do
+    with_env(
+      "IMAGE_DESCRIPTION_PROVIDER" => "openai",
+      "OPENAI_API_BASE_URL" => "http://ollama.test:11434/v1",
+      "OPENAI_VISION_MODEL" => "qwen3-vl:4b-instruct-q8_0",
+      "OPENAI_API_KEY" => "sk-env-secret-9876"
+    ) do
+      get settings_image_to_texts_path(provider_tab: "local")
+    end
+
+    assert_response :success
+    assert_select "#runtime-provider" do
+      assert_select "[data-runtime='provider']", text: /OpenAI-compatible API/
+      assert_select "[data-runtime='provider']", text: /IMAGE_DESCRIPTION_PROVIDER/
+      assert_select "[data-runtime='model']", text: /qwen3-vl:4b-instruct-q8_0/
+      assert_select "[data-runtime='model']", text: /OPENAI_VISION_MODEL/
+      assert_select "[data-runtime='base-url']", text: %r{http://ollama\.test:11434/v1}
+      assert_select "[data-runtime='base-url']", text: /OPENAI_API_BASE_URL/
+    end
+    assert_not_includes response.body, "sk-env-secret-9876"
+  end
+
+  test "index shows runtime openai values from saved settings" do
+    with_openai_env_cleared do
+      DescriptionProviderSetting.current.update!(
+        provider: "openai", openai_base_url: "http://saved.test/v1", openai_model: "gpt-4.1-mini"
+      )
+
+      get settings_image_to_texts_path
+    end
+
+    assert_response :success
+    assert_select "h2", "OpenAI-compatible provider"
+    assert_select "#runtime-provider" do
+      assert_select "[data-runtime='model']", text: /gpt-4\.1-mini/
+      assert_select "[data-runtime='model']", text: /Saved setting/
+      assert_select "[data-runtime='base-url']", text: %r{http://saved\.test/v1}
+    end
+  end
+
+  test "index shows the current local model when the local provider is active" do
+    image_to_texts(:two).update!(current: true)
+
+    with_openai_env_cleared do
+      get settings_image_to_texts_path(provider_tab: "openai")
+    end
+
+    assert_response :success
+    assert_select "#runtime-provider" do
+      assert_select "[data-runtime='provider']", text: /Local generator/
+      assert_select "[data-runtime='model']", text: /Florence-2-large/
+      assert_select "[data-runtime='base-url']", count: 0
+    end
+  end
+
   test "update_current saves local provider and selected local model" do
     model = image_to_texts(:one)
     DescriptionProviderSetting.current.update!(provider: "openai")
