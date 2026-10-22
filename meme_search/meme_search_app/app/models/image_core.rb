@@ -180,6 +180,7 @@ class ImageCore < ApplicationRecord
   end
 
   def refresh_description_embeddings
+    had_embeddings = ImageEmbedding.exists?(image_core_id: self.id)
     # destroy current description embeddings
     begin
       current_embeddings = ImageEmbedding.where({ image_core_id: self.id })
@@ -195,8 +196,10 @@ class ImageCore < ApplicationRecord
         snippets_hash.map { |hash| ImageEmbedding.new(hash).save! }
       end
     end
-    # New embeddings can turn the API description_status ready, so the change feed must see them.
-    touch if persisted?
+    # Touch only when the API description_status can flip: a plain recompute (e.g. a rebuild of
+    # every meme) must not reorder the gallery or flood the change feed with unchanged memes.
+    has_embeddings = self.description.to_s.length > 0
+    touch if persisted? && had_embeddings != has_embeddings
   end
 
   private

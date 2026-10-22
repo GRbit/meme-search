@@ -212,9 +212,10 @@ curl --get http://127.0.0.1:3000/api/v1/memes \
   it later: the response contains the memes created or changed since then.
 - `next_cursor` is absent only when the page is empty, which means nothing is
   newer; keep the cursor you already have.
-- A meme counts as changed when its description, generation status, tags, or
-  embeddings change. Renaming a tag in Settings does not mark its memes as
-  changed.
+- A meme counts as changed when its description, generation status, or tags
+  change, or when its embeddings appear or disappear (which can change
+  `description_status`). Recomputing existing embeddings and renaming a tag in
+  Settings do not mark a meme as changed.
 - Deleted memes are not reported. A client that mirrors the collection learns
   about a deletion from a `404` on `GET /api/v1/memes/:id` or its content URL.
 - Change times are taken when a change is written. A change that is still being

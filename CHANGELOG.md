@@ -14,9 +14,11 @@ Search API v1 additions (additive, read-only):
 - Added the optional `description_status` field (`pending`, `ready`,
   `failed`) to every meme object. `ready` means the meme has a description and
   its embeddings, so it is searchable in both modes.
-- Adding or removing a tag and recomputing a meme's embeddings
-  (`ImageCore#refresh_description_embeddings`) now bump the meme's
-  `updated_at`, so the listing reports those changes.
+- Adding or removing a tag now bumps the meme's `updated_at`, and so does
+  `ImageCore#refresh_description_embeddings` when a meme gains its first
+  embeddings or loses its last ones, so the listing reports those changes.
+  Recomputing embeddings that already exist leaves `updated_at` alone, so it
+  does not reorder the gallery or the change feed.
 - Added the `20261022000000` migration with an `image_cores (updated_at, id)`
   index; `db:prepare` applies it on startup and it changes no data.
 
