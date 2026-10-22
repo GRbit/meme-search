@@ -32,6 +32,7 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     assert_equal content_api_v1_meme_path(image_cores(:three)), body.dig("data", 0, "content_url")
     assert_nil body.dig("data", 0, "image_path")
     assert_equal image_paths(:two).name, body.dig("data", 0, "folder")
+    assert_equal "ready", body.dig("data", 0, "description_status")
   end
 
   test "loads result folders in one query" do
@@ -47,6 +48,23 @@ class Api::V1::SearchControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, image_path_queries.length, image_path_queries.join("\n")
   ensure
     ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
+  end
+
+  test "computes description status for all results in one embeddings query" do
+    embedding_queries = []
+    callback = lambda do |*, payload|
+      embedding_queries << payload[:sql] if payload[:sql].include?("image_embeddings")
+    end
+
+    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+      get api_v1_search_url, params: { q: "image", limit: 20 }, headers: authorization_header
+    end
+
+    assert_response :success
+    statuses = response.parsed_body["data"].to_h { |meme| [ meme["id"], meme["description_status"] ] }
+    assert_equal "ready", statuses[image_cores(:one).id]
+    assert_equal "pending", statuses[image_cores(:four).id]
+    assert_equal 1, embedding_queries.length, embedding_queries.join("\n")
   end
 
   test "rejects invalid queries and modes" do

@@ -4,7 +4,7 @@ Rails.application.routes.draw do
       get "search", to: "search#index"
       get "folders", to: "folders#index"
       get "tags", to: "tags#index"
-      resources :memes, only: [ :show ] do
+      resources :memes, only: [ :index, :show ] do
         get :content, on: :member
       end
     end

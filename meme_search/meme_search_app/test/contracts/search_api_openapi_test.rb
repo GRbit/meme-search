@@ -73,19 +73,38 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "keeps listing bounds and scope aligned with the server" do
+    listing = operation("/api/v1/memes")
+    parameters = listing.fetch("parameters").index_by { |parameter| parameter.fetch("name") }
+    list_meta = @contract.dig("components", "schemas", "MemeListResponse", "properties", "meta")
+
+    assert_equal "search:read", listing.fetch("x-required-scope")
+    assert_equal 1, parameters.dig("limit", "schema", "minimum")
+    assert_equal Api::V1::MemesController::LIST_MAX_LIMIT, parameters.dig("limit", "schema", "maximum")
+    assert_equal Api::V1::MemesController::LIST_DEFAULT_LIMIT, parameters.dig("limit", "schema", "default")
+    assert_equal Api::V1::MemesController::CURSOR_MAX_LENGTH, parameters.dig("cursor", "schema", "maxLength")
+    assert_equal Api::V1::MemesController::LIST_MAX_LIMIT, list_meta.dig("properties", "count", "maximum")
+    assert_equal %w[count has_more limit], list_meta.fetch("required").sort
+    assert_equal({ "requests" => 60, "window-seconds" => 60, "key" => "authenticated-token" },
+      listing.fetch("x-rate-limit"))
+  end
+
   test "requires current success fields while permitting additive v1 fields" do
     meme_schema = @contract.dig("components", "schemas", "Meme")
     search_schema = @contract.dig("components", "schemas", "SearchResponse")
     error_schema = @contract.dig("components", "schemas", "ErrorResponse")
     serialized_keys = Api::V1::MemeSerializer.new(
       image_cores(:one),
-      content_url: "/api/v1/memes/#{image_cores(:one).id}/content"
+      content_url: "/api/v1/memes/#{image_cores(:one).id}/content",
+      embedded: true
     ).as_json.keys.map(&:to_s)
 
     # Fields added after v1.0 stay optional so clients keep accepting older servers.
     assert_equal %w[content_url description filename id media_type tags],
       meme_schema.fetch("required").sort
     assert_equal serialized_keys.sort, meme_schema.fetch("properties").keys.sort
+    assert_equal Api::V1::MemeSerializer::DESCRIPTION_STATUSES.sort,
+      meme_schema.dig("properties", "description_status", "enum").sort
     assert_equal true, meme_schema.fetch("additionalProperties")
     assert_equal %w[count limit mode query tags].sort,
       search_schema.dig("properties", "meta", "required").sort
@@ -112,6 +131,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal %w[200 401 403 422 429], search_operation.fetch("responses").keys.sort
     assert_equal %w[200 401 403 429], operation("/api/v1/folders").fetch("responses").keys.sort
     assert_equal %w[200 401 403 429], operation("/api/v1/tags").fetch("responses").keys.sort
+    assert_equal %w[200 401 403 422 429], operation("/api/v1/memes").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404], operation("/api/v1/memes/{id}").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404],
       operation("/api/v1/memes/{id}/content").fetch("responses").keys.sort
@@ -154,6 +174,23 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     get api_v1_tags_url, headers: authorization_header
     assert_response :success
     assert_schema_instance("TagListResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { limit: 2 }, headers: authorization_header
+    assert_response :success
+    assert_schema_instance("MemeListResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { cursor: response.parsed_body.dig("meta", "next_cursor"), limit: 100 },
+      headers: authorization_header
+    assert_response :success
+    get api_v1_memes_url, params: { cursor: response.parsed_body.dig("meta", "next_cursor") },
+      headers: authorization_header
+    assert_response :success
+    assert_empty response.parsed_body["data"]
+    assert_schema_instance("MemeListResponse", response.parsed_body)
+
+    get api_v1_memes_url, params: { cursor: "bogus!" }, headers: authorization_header
+    assert_response :unprocessable_entity
+    assert_schema_instance("ErrorResponse", response.parsed_body)
 
     get api_v1_search_url, params: { q: "bunny" }
     assert_response :unauthorized
@@ -275,6 +312,8 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     end
 
     def schema_type?(type, value)
+      return value == true || value == false if type == "boolean"
+
       ruby_type = {
         "array" => Array,
         "integer" => Integer,

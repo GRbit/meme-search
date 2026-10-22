@@ -96,6 +96,24 @@ Uploads through the API:
 
 API v1 is unchanged. No database migration.
 
+Search API v1 additions (additive, read-only):
+
+- Added `GET /api/v1/memes`, a cursor-paginated listing in change order
+  (`updated_at`, then id) so clients can mirror the library and poll for new
+  and changed memes. `limit` is 1-100 (default 50); the opaque cursor stays
+  stable when memes share a timestamp. It uses `search:read` and its own
+  per-token limit of 60 requests per minute. Deletions are not reported.
+- Added the optional `description_status` field (`pending`, `ready`,
+  `failed`) to every meme object. `ready` means the meme has a description and
+  its embeddings, so it is searchable in both modes.
+- Adding or removing a tag and recomputing a meme's embeddings
+  (`ImageCore#refresh_description_embeddings`) now bump the meme's
+  `updated_at`, so the listing reports those changes.
+- Added the `20261022000000` migration with an `image_cores (updated_at, id)`
+  index; `db:prepare` applies it on startup and it changes no data.
+
+See [Search API and local integrations](docs/search-api.md#list-and-sync-memes).
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:
