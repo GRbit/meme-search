@@ -130,6 +130,10 @@ Search API v1 paging (additive):
   results exist, `next_offset`. Results with equal rank are ordered by meme id
   so pages do not overlap. Existing parameters, bounds and fields are unchanged.
 
+- The Solid Queue worker thread count is configurable with `JOB_THREADS`
+  (default 3, unchanged). Set `JOB_THREADS=1` for an OpenAI-compatible server
+  that handles one request at a time, such as Ollama.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:
