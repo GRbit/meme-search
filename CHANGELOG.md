@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+OpenAI-compatible description provider visibility:
+
+- Settings -> AI Models now shows the runtime provider, model and base URL
+  that description generation actually uses, including values set by
+  `IMAGE_DESCRIPTION_PROVIDER`, `OPENAI_VISION_MODEL` and
+  `OPENAI_API_BASE_URL`, and opens on the tab of that runtime provider.
+- The OpenAI-compatible model is now a free-text field with the previous
+  OpenAI models as suggestions, so models from servers such as Ollama can be
+  saved from the UI. Model names are limited to 200 characters; the
+  validation error for an invalid name is now "is too long" instead of "is not
+  included in the list". Saved model names stay valid.
+- Queuing a single description with the OpenAI-compatible provider now shows
+  "Queued description generation with <model>.", and each successful
+  generation logs the provider and model in the job worker.
+
+This change does not alter the database schema or Search API contract.
+
 ## [2.3.2] - 2026-08-04
 
 Dependency and CI maintenance:
