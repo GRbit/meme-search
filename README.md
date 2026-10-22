@@ -148,7 +148,7 @@ Features of Meme Search include:
 
 7. **New Organizational Tools**
 
-   Filter by tags, directory paths, and description embeddings, plus toggle between keyword and vector search for more control.
+   Filter by tags, directory paths, and description embeddings, plus toggle between keyword and vector search for more control. Search results can be limited to selected tags and directory paths as well.
 
 8. **Bulk Description Generation**
 
@@ -330,7 +330,8 @@ Once registered in the app, your memes are ready for indexing / tagging / etc.,!
 
 ### Search API and local integrations
 
-Search, inspect metadata, and fetch authorized media through the stable,
+Search (optionally inside library folders), list folders, inspect metadata,
+and fetch authorized media through the stable,
 read-only `/api/v1` contract—without giving clients PostgreSQL credentials,
 Docker-network access, schema knowledge, or filesystem paths.
 

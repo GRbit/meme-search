@@ -13,10 +13,13 @@ class ImageSearchQuery
     same so than too very s
   ].freeze
 
-  def initialize(query:, mode:, selected_tag_names: [], limit: DEFAULT_RESULT_LIMIT)
+  # selected_tag_names and selected_path_names (exact ImagePath names) each match
+  # any of their entries; when both are given a meme has to satisfy both.
+  def initialize(query:, mode:, selected_tag_names: [], selected_path_names: [], limit: DEFAULT_RESULT_LIMIT)
     @query = query.to_s
     @mode = mode.to_s
     @selected_tag_names = Array(selected_tag_names).compact_blank
+    @selected_path_names = Array(selected_path_names).compact_blank
     @limit = normalize_limit(limit)
   end
 
@@ -33,11 +36,11 @@ class ImageSearchQuery
 
   private
 
-    attr_reader :query, :mode, :selected_tag_names, :limit
+    attr_reader :query, :mode, :selected_tag_names, :selected_path_names, :limit
 
     def keyword_results
       relation = ImageCore.search_any_word(remove_stopwords(query))
-      relation = relation.where(id: tagged_image_core_ids) if selected_tag_names.any?
+      relation = relation.where(id: eligible_image_core_ids) if filtered?
       relation.limit(limit).to_a
     end
 
@@ -47,13 +50,27 @@ class ImageSearchQuery
 
       query_embedding = ImageEmbedding.new(image_core_id: image_core.id, snippet: query)
       query_embedding.compute_embedding
+      # The filter works before ranking only because this is an exact scan: no vector
+      # index exists. An approximate index (HNSW) would filter after its candidate
+      # search and needs pgvector's iterative index scan to keep filtered results.
       ranked_ids = query_embedding.get_neighbor_image_core_ids(
         limit: limit,
-        image_core_ids: selected_tag_names.any? ? tagged_image_core_ids : nil
+        image_core_ids: filtered? ? eligible_image_core_ids : nil
       )
       image_cores_by_id = ImageCore.where(id: ranked_ids).index_by(&:id)
 
       ranked_ids.filter_map { |image_core_id| image_cores_by_id[image_core_id] }
+    end
+
+    def filtered?
+      selected_tag_names.any? || selected_path_names.any?
+    end
+
+    def eligible_image_core_ids
+      relation = ImageCore.all
+      relation = relation.where(id: tagged_image_core_ids) if selected_tag_names.any?
+      relation = relation.where(image_path_id: ImagePath.where(name: selected_path_names).select(:id)) if selected_path_names.any?
+      relation.select(:id)
     end
 
     def tagged_image_core_ids

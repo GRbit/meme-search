@@ -249,6 +249,7 @@ class ImageCoresController < ApplicationController
 
   def search_items
     selected_tag_names = search_params[:selected_tag_names]
+    selected_path_names = search_params[:selected_path_names]
     search_params.delete(:selected_tag_names)
 
     @query = search_params["query"]
@@ -256,7 +257,8 @@ class ImageCoresController < ApplicationController
     @image_cores = ImageSearchQuery.new(
       query: @query,
       mode: @checkbox_value,
-      selected_tag_names: selected_tag_names
+      selected_tag_names: selected_tag_names,
+      selected_path_names: selected_path_names
     ).call
 
     respond_to do |format|
@@ -488,11 +490,15 @@ class ImageCoresController < ApplicationController
     end
 
   def search_params
-    permitted_params = params.permit([ :query, :checkbox_value, :authenticity_token, :source, :controller, :action, :selected_tag_names, search_tags: [ :tag ] ])
+    permitted_params = params.permit([ :query, :checkbox_value, :authenticity_token, :source, :controller, :action, :selected_tag_names, :selected_path_names, search_tags: [ :tag ], search_paths: [ :path ] ])
     permitted_params.delete(:search_tags)
+    permitted_params.delete(:search_paths)
     selected_tag_names = (permitted_params[:selected_tag_names] || "").split(",").map { |tag| tag.strip }
     permitted_params.delete(:selected_tag_names)
     permitted_params[:selected_tag_names] = selected_tag_names
+    selected_path_names = (permitted_params[:selected_path_names] || "").split(",").map(&:strip)
+    permitted_params.delete(:selected_path_names)
+    permitted_params[:selected_path_names] = selected_path_names
     permitted_params
   end
 end

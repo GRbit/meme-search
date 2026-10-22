@@ -27,11 +27,6 @@
                 id: "search-box" %>
             </div>
 
-            <!-- Tag Filter -->
-            <div class="w-full md:w-64">
-              <%= render 'tag_toggle' %>
-            </div>
-
             <!-- Keyword/Vector Toggle -->
             <div class="flex items-center gap-3">
               <label class="inline-flex items-center cursor-pointer">
@@ -39,6 +34,16 @@
                 <div class="relative w-14 h-7 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
                 <span class="ms-3 text-sm font-medium text-gray-900 dark:text-gray-300" id="search-toggle-text">keyword</span>
               </label>
+            </div>
+          </div>
+
+          <!-- Tag and Folder Filters: a second row keeps the search box wide -->
+          <div class="flex flex-col md:flex-row gap-4 mt-4">
+            <div class="w-full md:w-1/2">
+              <%= render 'tag_toggle' %>
+            </div>
+            <div class="w-full md:w-1/2">
+              <%= render 'path_toggle' %>
             </div>
           </div>
         <% end %>

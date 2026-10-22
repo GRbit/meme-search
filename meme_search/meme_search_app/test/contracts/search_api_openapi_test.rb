@@ -40,12 +40,20 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal ApiToken::ALLOWED_SCOPES, @contract.dig("info", "x-token-scopes")
     assert_equal "search:read", search_operation.fetch("x-required-scope")
     assert_equal "search:read", operation("/api/v1/memes/{id}").fetch("x-required-scope")
+    assert_equal "search:read", operation("/api/v1/folders").fetch("x-required-scope")
+    assert_equal(
+      { "requests" => 60, "window-seconds" => 60, "key" => "authenticated-token" },
+      operation("/api/v1/folders").fetch("x-rate-limit")
+    )
     assert_equal "media:read", operation("/api/v1/memes/{id}/content").fetch("x-required-scope")
     assert_equal Api::V1::SearchController::QUERY_MAX_LENGTH, parameters.dig("q", "schema", "maxLength")
     assert_equal Api::V1::SearchController::ALLOWED_MODES, parameters.dig("mode", "schema", "enum")
     assert_equal Api::V1::SearchController::TAG_MAX_COUNT, parameters.dig("tag", "schema", "maxItems")
     assert_equal Api::V1::SearchController::TAG_MAX_LENGTH,
       parameters.dig("tag", "schema", "items", "maxLength")
+    assert_equal Api::V1::SearchController::FOLDER_MAX_COUNT, parameters.dig("folder", "schema", "maxItems")
+    assert_equal Api::V1::SearchController::FOLDER_MAX_LENGTH,
+      parameters.dig("folder", "schema", "items", "maxLength")
     assert_equal(
       ImageSearchQuery::MAX_RESULT_LIMIT,
       parameters.dig("limit", "schema", "maximum")
@@ -71,7 +79,9 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       content_url: "/api/v1/memes/#{image_cores(:one).id}/content"
     ).as_json.keys.map(&:to_s)
 
-    assert_equal serialized_keys.sort, meme_schema.fetch("required").sort
+    # Fields added after v1.0 stay optional so clients keep accepting older servers.
+    assert_equal %w[content_url description filename id media_type tags],
+      meme_schema.fetch("required").sort
     assert_equal serialized_keys.sort, meme_schema.fetch("properties").keys.sort
     assert_equal true, meme_schema.fetch("additionalProperties")
     assert_equal %w[count limit mode query tags].sort,
@@ -97,6 +107,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
 
   test "documents the exact status matrix and supported media types" do
     assert_equal %w[200 401 403 422 429], search_operation.fetch("responses").keys.sort
+    assert_equal %w[200 401 403 429], operation("/api/v1/folders").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404], operation("/api/v1/memes/{id}").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404],
       operation("/api/v1/memes/{id}/content").fetch("responses").keys.sort
@@ -125,6 +136,16 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       headers: authorization_header
     assert_response :success
     assert_schema_instance("SearchResponse", response.parsed_body)
+
+    get api_v1_search_url,
+      params: { q: "image", folder: image_paths(:two).name },
+      headers: authorization_header
+    assert_response :success
+    assert_schema_instance("SearchResponse", response.parsed_body)
+
+    get api_v1_folders_url, headers: authorization_header
+    assert_response :success
+    assert_schema_instance("FolderListResponse", response.parsed_body)
 
     get api_v1_search_url, params: { q: "bunny" }
     assert_response :unauthorized

@@ -15,7 +15,8 @@ module Api
           description: image_core.description,
           tags: image_core.image_tags.filter_map { |tag| tag.tag_name&.name },
           media_type: Rack::Mime.mime_type(File.extname(image_core.name.to_s).downcase, "application/octet-stream"),
-          content_url: content_url
+          content_url: content_url,
+          folder: image_core.image_path&.name
         }
       end
 

@@ -49,6 +49,17 @@ paths:
               maxLength: 20
           style: form
           explode: true
+        - name: folder
+          in: query
+          description: May be repeated. Each value is one exact library folder name relative to the memes root, as listed by `GET /api/v1/folders` and returned in the `folder` response field (case-sensitive, may contain `/`). Results match any supplied folder and, when tags are also given, any supplied tag as well. Unknown names return 422 `invalid_folder`.
+          schema:
+            type: array
+            maxItems: 10
+            items:
+              type: string
+              maxLength: 300
+          style: form
+          explode: true
         - name: limit
           in: query
           schema:
@@ -69,6 +80,29 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /api/v1/folders:
+    get:
+      summary: List library folders with meme counts
+      description: Every registered library folder, including folders without memes, ordered by name. Names are relative to the memes root and are the values `folder` accepts on search.
+      operationId: listFolders
+      x-required-scope: search:read
+      x-rate-limit:
+        requests: 60
+        window-seconds: 60
+        key: authenticated-token
+      responses:
+        "200":
+          description: Library folders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FolderListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "429":
           $ref: "#/components/responses/RateLimited"
   /api/v1/memes/{id}:
@@ -177,6 +211,10 @@ components:
         content_url:
           type: string
           pattern: "^/api/v1/memes/[1-9][0-9]*/content$"
+        folder:
+          type: string
+          maxLength: 300
+          description: Library folder the meme belongs to, as its name relative to the memes root (for example `work/reactions`). Never a filesystem path. Optional because older v1 servers omit it.
     SearchResponse:
       type: object
       additionalProperties: true
@@ -200,6 +238,11 @@ components:
               type: array
               items:
                 type: string
+            folders:
+              type: array
+              description: The applied folder filter; empty without one. Older v1 servers omit it and ignore `folder`.
+              items:
+                type: string
             limit:
               type: integer
               minimum: 1
@@ -208,6 +251,33 @@ components:
               type: integer
               minimum: 0
               maximum: 20
+    FolderListResponse:
+      type: object
+      additionalProperties: true
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [name, meme_count]
+            properties:
+              name:
+                type: string
+                maxLength: 300
+                description: Library folder name relative to the memes root, never a filesystem path.
+              meme_count:
+                type: integer
+                minimum: 0
+        meta:
+          type: object
+          additionalProperties: true
+          required: [count]
+          properties:
+            count:
+              type: integer
+              minimum: 0
     ErrorResponse:
       type: object
       additionalProperties: true
