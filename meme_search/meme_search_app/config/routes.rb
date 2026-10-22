@@ -6,6 +6,8 @@ Rails.application.routes.draw do
       get "tags", to: "tags#index"
       resources :memes, only: [ :index, :show ] do
         get :content, on: :member
+        # Served by SearchController so it shares the per-token search rate limit bucket.
+        get :similar, on: :member, to: "search#similar"
       end
     end
     namespace :v2 do

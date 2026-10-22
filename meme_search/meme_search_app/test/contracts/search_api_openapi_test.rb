@@ -47,6 +47,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     )
     assert_equal "search:read", operation("/api/v1/tags").fetch("x-required-scope")
     assert_equal "media:read", operation("/api/v1/memes/{id}/content").fetch("x-required-scope")
+    assert_equal "search:read", similar_operation.fetch("x-required-scope")
     assert_equal Api::V1::SearchController::QUERY_MAX_LENGTH, parameters.dig("q", "schema", "maxLength")
     assert_equal Api::V1::SearchController::ALLOWED_MODES, parameters.dig("mode", "schema", "enum")
     assert_equal Api::V1::SearchController::TAG_MAX_COUNT, parameters.dig("tag", "schema", "maxItems")
@@ -71,6 +72,12 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
       },
       search_operation.fetch("x-rate-limit")
     )
+    assert_equal search_operation.fetch("x-rate-limit"), similar_operation.fetch("x-rate-limit")
+
+    similar_limit = similar_operation.fetch("parameters").find { |parameter| parameter["name"] == "limit" }
+    assert_equal 1, similar_limit.dig("schema", "minimum")
+    assert_equal ImageSearchQuery::MAX_RESULT_LIMIT, similar_limit.dig("schema", "maximum")
+    assert_equal ImageSearchQuery::DEFAULT_RESULT_LIMIT, similar_limit.dig("schema", "default")
   end
 
   test "keeps listing bounds and scope aligned with the server" do
@@ -133,6 +140,7 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_equal %w[200 401 403 429], operation("/api/v1/tags").fetch("responses").keys.sort
     assert_equal %w[200 401 403 422 429], operation("/api/v1/memes").fetch("responses").keys.sort
     assert_equal %w[200 401 403 404], operation("/api/v1/memes/{id}").fetch("responses").keys.sort
+    assert_equal %w[200 401 403 404 422 429], similar_operation.fetch("responses").keys.sort
     assert_equal %w[200 401 403 404],
       operation("/api/v1/memes/{id}/content").fetch("responses").keys.sort
     assert_equal(
@@ -214,6 +222,14 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     assert_schema_instance("ErrorResponse", response.parsed_body)
 
+    get similar_api_v1_meme_url(image_cores(:one).id), headers: authorization_header
+    assert_response :success
+    assert_schema_instance("SimilarResponse", response.parsed_body)
+
+    get similar_api_v1_meme_url(image_cores(:one).id), params: { limit: 0 }, headers: authorization_header
+    assert_response :unprocessable_entity
+    assert_schema_instance("ErrorResponse", response.parsed_body)
+
     get api_v1_meme_url(image_cores(:one).id), headers: authorization_header
     assert_response :success
     metadata_schema = operation("/api/v1/memes/{id}")
@@ -233,6 +249,10 @@ class SearchApiOpenapiTest < ActionDispatch::IntegrationTest
 
     def search_operation
       operation("/api/v1/search")
+    end
+
+    def similar_operation
+      operation("/api/v1/memes/{id}/similar")
     end
 
     def authorization_header

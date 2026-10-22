@@ -200,6 +200,42 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+  /api/v1/memes/{id}/similar:
+    get:
+      summary: Find memes whose descriptions are closest to one meme's description
+      description: Ranks other memes by cosine distance between their closest description chunk and the full-description embedding of the given meme, which is excluded. A meme without embeddings yet returns an empty list. Requests count against the same per-token limit as search.
+      operationId: getSimilarMemes
+      x-required-scope: search:read
+      x-rate-limit:
+        requests: 60
+        window-seconds: 60
+        key: authenticated-token
+      parameters:
+        - $ref: "#/components/parameters/MemeId"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        "200":
+          description: Ranked similar memes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimilarResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/RateLimited"
   /api/v1/memes/{id}/content:
     get:
       summary: Stream the original media bytes
@@ -408,6 +444,30 @@ components:
             next_cursor:
               type: string
               description: Absent when the page is empty, so a client keeps the cursor it already has.
+    SimilarResponse:
+      type: object
+      additionalProperties: true
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Meme"
+        meta:
+          type: object
+          additionalProperties: true
+          required: [meme_id, limit, count]
+          properties:
+            meme_id:
+              type: integer
+            limit:
+              type: integer
+              minimum: 1
+              maximum: 20
+            count:
+              type: integer
+              minimum: 0
+              maximum: 20
     ErrorResponse:
       type: object
       additionalProperties: true
