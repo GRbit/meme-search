@@ -60,4 +60,21 @@ class ImageCoreTest < ActiveSupport::TestCase
     end
     assert_empty $embedding_model.calls
   end
+
+  test "refresh_description_embeddings keeps old embeddings when inference fails" do
+    $embedding_model = FakeEmbeddingModel.new(fail_on_call: 2)
+
+    assert_raises(RuntimeError) { @image_core.refresh_description_embeddings }
+
+    assert_equal @old_embedding_ids.sort, ImageEmbedding.where(image_core_id: @image_core.id).pluck(:id).sort
+  end
+
+  test "refresh_description_embeddings keeps old embeddings when saving a new one fails" do
+    # A 385-dim vector fails validation on save!, so the failure happens after inference, inside the swap.
+    $embedding_model = FakeEmbeddingModel.new(fail_on_call: 2, failure: -> { Array.new(385, 0.3) })
+
+    assert_raises(ActiveRecord::RecordInvalid) { @image_core.refresh_description_embeddings }
+
+    assert_equal @old_embedding_ids.sort, ImageEmbedding.where(image_core_id: @image_core.id).pluck(:id).sort
+  end
 end
